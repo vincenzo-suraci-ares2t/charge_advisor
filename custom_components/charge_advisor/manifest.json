@@ -12,8 +12,6 @@
     "issue_tracker": "https://github.com/vincenzo-suraci-ares2t/charge_advisor/issues",
     "name": "Charge Advisor",
     "requirements": [
-        "ocpp>=0.14.1",
-        "websockets>=10.2",
         "ocpp >= 0.14.1",
         "websockets >= 10.2",
         "certifi >= 14.05.14",
