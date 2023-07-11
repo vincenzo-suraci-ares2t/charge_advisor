@@ -1,0 +1,29 @@
+{
+    "after_dependencies": [
+        "persistent_notification"
+    ],
+    "codeowners": [
+        "@vincenzosuraci"
+    ],
+    "config_flow": true,
+    "documentation": "https://github.com/lbbrhzn/ocpp/blob/main/README.md",
+    "domain": "ocpp",
+    "iot_class": "local_push",
+    "issue_tracker": "https://github.com/lbbrhzn/ocpp/issues",
+    "name": "Open Charge Point Protocol (OCPP)",
+    "requirements": [
+        "ocpp>=0.14.1",
+        "websockets>=10.2",
+        "ocpp >= 0.14.1",
+        "websockets >= 10.2",
+        "certifi >= 14.05.14",
+        "six >= 1.10",
+        "python_dateutil >= 2.5.3",
+        "setuptools >= 21.0.0"
+    ],
+    "commented_requirements": [
+        "git+https://<USER>:<TOKEN>@bitbucket.org/ares2t/ocpp-central-system.git@master#ocpp-central-system",
+        "git+ssh://git@bitbucket.org/ares2t/ocpp-central-system.git@master#ocpp-central-system"
+    ],
+    "version": "v0.4.37"
+}
