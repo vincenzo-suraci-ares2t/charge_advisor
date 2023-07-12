@@ -19,5 +19,5 @@
         "python_dateutil >= 2.5.3",
         "setuptools >= 21.0.0"
     ],
-    "version": "v0.1.0"
+    "version": "v0.0.1"
 }
