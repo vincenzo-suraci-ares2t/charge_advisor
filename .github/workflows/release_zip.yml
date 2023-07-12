@@ -10,4 +10,4 @@ jobs:
       with:
         type: 'zip'
         filename: 'charge_advisor.zip'
-        path: './custom_components/charge_advisor'        
+        path: 'custom_components/charge_advisor'        
