@@ -44,7 +44,7 @@ from .charge_point import HomeAssistantChargePoint
 from .const import *
 from .enums import HAChargePointServices
 from .logger import OcppLog
-from .installation_config_keys import *
+from .config import *
 
 
 

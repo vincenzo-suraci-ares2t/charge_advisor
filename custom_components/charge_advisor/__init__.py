@@ -15,7 +15,7 @@ import sys
 #Perchè const importa ocpp_central_system. Se noi importassimo qui const, non funzionerebbe,
 #perchè non troverebbe central system
 
-from .installation_config_keys import INTEGRATION_TYPE
+from .config import INTEGRATION_TYPE
 
 """Importing integration"""
 
