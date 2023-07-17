@@ -5,5 +5,4 @@ This is a Home Assistant integration for Charge Advisor
 * based on the [Home Assistant OCPP integration](https://github.com/lbbrhzn/ocpp).
 * HACS compliant repository
 
-Last update: 17/07/2023 15:17
-
+Last update: 17/07/2023 15:28
