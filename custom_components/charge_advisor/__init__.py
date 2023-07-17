@@ -37,9 +37,9 @@ else:
 
 
 # Package installato per non andare in conflitto con Home Assistant
-logging.error(subprocess.run([f"pip install urllib3==1.26.16"], shell=True, capture_output=True))
+logging.error(subprocess.run([f"pip install urllib3>=1.26.16"], shell=True, capture_output=True))
 # Package installato per non andare in conflitto con Home Assistant
-logging.error(subprocess.run([f"pip install pyOpenSSL==23.1.0"], shell=True, capture_output=True))
+logging.error(subprocess.run([f"pip install pyOpenSSL>=23.1.0"], shell=True, capture_output=True))
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Home Assistant packages
