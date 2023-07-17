@@ -19,7 +19,7 @@ from .config import *
 
 """Importing integration"""
 
-logging.error("Importing package")
+logging.debug("Importing package")
 local_package_name = "./custom_components/ocpp/ocpp_central_system"
 
 # Path assoluto alla chiave per accedere al repository di ocpp_central_system
@@ -29,7 +29,7 @@ package_url = "git+ssh://git@bitbucket.org/ares2t/ocpp-central-system.git"
 
 if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
     # Installazione del package ocpp_central_system da bitbucket con chiave
-    logging.error(subprocess.run([f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade-strategy only-if-needed"], shell=True, capture_output=True))
+    logging.debug(subprocess.run([f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade-strategy only-if-needed"], shell=True, capture_output=True))
 else:
     logging.debug("Installing Dev Integration")
     # Installazione del package da locale, solo debug
