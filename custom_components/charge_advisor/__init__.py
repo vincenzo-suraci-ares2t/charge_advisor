@@ -26,12 +26,12 @@ match INTEGRATION_TYPE:
         key_path = "/config/ssh-keys/ocpp-central-system-key"
         # Url al repository git (bitbucket) di ocpp_central_system
         package_url = "git+ssh://git@bitbucket.org/ares2t/ocpp-central-system.git"
-        logging.debug(subprocess.run([f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade-strategy only-if-needed"], shell=True, capture_output=True))
+        logging.info(subprocess.run([f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade-strategy only-if-needed"], shell=True, capture_output=True))
     case [INTEGRATION_TYPE_DEV]:
         # Installazione del package da locale, solo debug
         # Path alla directory locale di ocpp_central_system
         local_package_name = "./custom_components/ocpp/ocpp_central_system"
-        logging.debug(subprocess.run([f"pip install --upgrade --force-reinstall -e {local_package_name}"], shell=True, capture_output=True))
+        logging.info(subprocess.run([f"pip install --upgrade --force-reinstall -e {local_package_name}"], shell=True, capture_output=True))
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Home Assistant packages
