@@ -19,9 +19,6 @@ from .config import *
 
 """Importing integration"""
 
-logging.debug("Importing package")
-local_package_name = "./custom_components/ocpp/ocpp_central_system"
-
 # Path assoluto alla chiave per accedere al repository di ocpp_central_system
 key_path = "/config/ssh-keys/ocpp-central-system-key"
 # Url al repository git (bitbucket) di ocpp_central_system
@@ -31,8 +28,8 @@ if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
     # Installazione del package ocpp_central_system da bitbucket con chiave
     logging.debug(subprocess.run([f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade-strategy only-if-needed"], shell=True, capture_output=True))
 else:
-    logging.debug("Installing Dev Integration")
     # Installazione del package da locale, solo debug
+    local_package_name = "./custom_components/ocpp/ocpp_central_system"
     logging.debug(subprocess.run([f"pip install --upgrade --force-reinstall -e {local_package_name}"], shell=True, capture_output=True))
 
 # Package installato per non andare in conflitto con Home Assistant
