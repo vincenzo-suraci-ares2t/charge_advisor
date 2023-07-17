@@ -11,11 +11,11 @@ import sys
 
 
 
-#Questa variabile deve stare qui, non può essere messa in const
-#Perchè const importa ocpp_central_system. Se noi importassimo qui const, non funzionerebbe,
-#perchè non troverebbe central system
+# Questa variabile deve stare qui, non può essere messa in const
+# Perchè const importa ocpp_central_system. Se noi importassimo qui const, non funzionerebbe,
+# perchè non troverebbe central system
 
-from .config import INTEGRATION_TYPE
+from .config import *
 
 """Importing integration"""
 
@@ -27,7 +27,7 @@ key_path = "/config/ssh-keys/ocpp-central-system-key"
 # Url al repository git (bitbucket) di ocpp_central_system
 package_url = "git+ssh://git@bitbucket.org/ares2t/ocpp-central-system.git"
 
-if INTEGRATION_TYPE == "Prod":
+if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
     # Installazione del package ocpp_central_system da bitbucket con chiave
     logging.error(subprocess.run([f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade-strategy only-if-needed"], shell=True, capture_output=True))
 else:

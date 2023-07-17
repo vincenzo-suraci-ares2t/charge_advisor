@@ -31,8 +31,6 @@ from ocpp_central_system.const import *
 
 from .enums import HAChargePointSensors
 
-
-INTEGRATION_TYPE = "Dev" #Prod Instead
 # Home Assistant Energy and Power UoM
 HA_ENERGY_UNIT = UnitOfMeasure.kwh.value
 HA_POWER_UNIT = UnitOfMeasure.kw.value
