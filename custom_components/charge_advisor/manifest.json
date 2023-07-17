@@ -19,7 +19,7 @@
         "python_dateutil >= 2.5.3",
         "setuptools >= 21.0.0",
         "cryptography == 41.0.1",
-        "urllib3 == 1.26.6",
+        "urllib3<2.0.0,>=1.26.6",
         "pyOpenSSL >= 23.1.0"
     ],
     "version": "v0.0.1"
