@@ -12,14 +12,15 @@
     "issue_tracker": "https://github.com/vincenzo-suraci-ares2t/charge_advisor/issues",
     "name": "Charge Advisor",
     "requirements": [
-        "ocpp>=0.14.1",
-        "websockets>=10.2",
         "ocpp >= 0.14.1",
         "websockets >= 10.2",
         "certifi >= 14.05.14",
         "six >= 1.10",
         "python_dateutil >= 2.5.3",
-        "setuptools >= 21.0.0"
+        "setuptools >= 21.0.0",
+        "cryptography == 41.0.1",
+        "urllib3 == 1.26.6",
+        "pyOpenSSL >= 23.1.0"
     ],
     "version": "v0.0.1"
 }

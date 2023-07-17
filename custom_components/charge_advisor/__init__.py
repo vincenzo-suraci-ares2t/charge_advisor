@@ -35,11 +35,12 @@ else:
     # Installazione del package da locale, solo debug
     logging.error(subprocess.run([f"pip install --upgrade --force-reinstall -e {local_package_name}"], shell=True, capture_output=True))
 
-
 # Package installato per non andare in conflitto con Home Assistant
-logging.error(subprocess.run([f"pip install urllib3>=1.26.16"], shell=True, capture_output=True))
+# logging.error(subprocess.run([f"pip install cryptography==41.0.1"], shell=True, capture_output=True))
 # Package installato per non andare in conflitto con Home Assistant
-logging.error(subprocess.run([f"pip install pyOpenSSL>=23.1.0"], shell=True, capture_output=True))
+# logging.error(subprocess.run([f"pip install urllib3==1.26.6"], shell=True, capture_output=True))
+# Package installato per non andare in conflitto con Home Assistant
+# logging.error(subprocess.run([f"pip install pyOpenSSL>=23.1.0"], shell=True, capture_output=True))
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Home Assistant packages
