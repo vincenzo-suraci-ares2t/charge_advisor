@@ -142,27 +142,6 @@ class HomeAssistantCentralSystem(ChargingStationManagementSystem, HomeAssistantE
             super()._get_init_subprotocols()
         )
 
-    def _get_init_ca_host(self):
-        return CA_HOST
-
-    def _get_init_ws_port(self):
-        return WS_PORT
-
-    def _get_init_use_ssl(self):
-        return USE_SSL
-
-    def _get_init_use_wss(self):
-        return USE_WSS
-
-    def _get_init_ca_auth_token(self):
-        return CA_AUTH_TOKEN
-
-    def _get_init_ca_sampling_time(self):
-        return CA_SAMPLING_TIME
-
-    def _get_init_ca_auto_cp_update(self):
-        return AUTO_CP_UPDATE
-
     #def _start_pusher_communication_handler(self):
     #    self._pusher_communication_handler = CentralSystemCommunicationChannel(self._hass, self)
     #    self._pusher_communication_handler.start()
