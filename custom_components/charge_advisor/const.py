@@ -101,7 +101,7 @@ HA_CHARGE_POINT_DIAGNOSTIC_SENSORS = [
     HAChargePointSensors.config_response.value,
 ]
 
-DOMAIN = "ocpp"
+DOMAIN = "charge_advisor"
 CONFIG = "config"
 ICON = "mdi:ev-station"
 
