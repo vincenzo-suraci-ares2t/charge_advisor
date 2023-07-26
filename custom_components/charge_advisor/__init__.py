@@ -21,7 +21,7 @@ if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
 elif INTEGRATION_TYPE == INTEGRATION_TYPE_DEV:
     # Installazione del package da locale, solo debug
     # Path alla directory locale di ocpp_central_system
-    local_package_name = "./custom_components/ocpp/ocpp_central_system"
+    local_package_name = "./custom_components/charge_advisor/ocpp_central_system"
     logging.error(subprocess.run([f"pip install --upgrade --force-reinstall -e {local_package_name}"], shell=True, capture_output=True))
 
 # ----------------------------------------------------------------------------------------------------------------------
