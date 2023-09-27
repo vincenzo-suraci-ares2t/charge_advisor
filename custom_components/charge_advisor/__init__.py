@@ -16,7 +16,7 @@ if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
     # Path assoluto alla chiave per accedere al repository di ocpp_central_system
     key_path = "/config/ssh-keys/ocpp-central-system-key"
     # Url al repository git (bitbucket) di ocpp_central_system
-    package_url = "git+ssh://git@bitbucket.org/ares2t/ocpp-central-system.git"
+    package_url = "git+ssh://git@bitbucket.org/a2t-smartcity/ocpp-central-system.git"
     logging.error(subprocess.run([f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade --upgrade-strategy only-if-needed"], shell=True, capture_output=True))
 elif INTEGRATION_TYPE == INTEGRATION_TYPE_DEV:
     # Installazione del package da locale, solo debug
