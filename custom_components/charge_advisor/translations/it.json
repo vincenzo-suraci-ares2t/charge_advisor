@@ -1,0 +1,61 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "OCPP - Configurazione",
+                "description": "Se hai bisogno di aiuto nella configurazione, guarda qui: https://github.com/lbbrhzn/ocpp",
+                "data": {
+                    "host": "Indirizzo IP o hostname del Sistema centrale",
+                    "port": "Porta del Sistema centrale",
+                    "ssl": "Connessione sicura",
+                    "csid": "Identificativo del Sistema centrale",
+                    "cpid": "Identificativo del Punto di ricarica",
+                    "max_current": "Massima corrente di ricarica",
+                    "meter_interval": "Intervallo di campionamento quando una ricarica è attiva (secondi)",
+                    "idle_interval": "Intervallo di campionamento quando una ricarica è inattiva (secondi)",
+                    "websocket_close_timeout": "Timeout di chiusura della Websocket close timeout (secondi)",
+                    "websocket_ping_tries": "Numero di tentativi prima di chiudere la Websocket",
+                    "websocket_ping_interval": "Intervallo tra due ping della Websocket (secondi)",
+                    "websocket_ping_timeout": "Timeout del ping della Websocket (secondi)",
+                    "skip_schema_validation": "Salta la validazione dello schema OCPP",
+                    "force_smart_charging": "Forza l'utilizzo della funzionalità di Smart Charging"
+                }
+            },
+            "measurands": {
+                "title": "OCPP - Grandezze da misurare",
+                "description": "Seleziona quali delle seguenti grandezze devono essere mostrate in Home Assistant.",
+                "data": {
+                    "Current.Export": "Corrente istantanea prelevata dal VE",
+                    "Current.Import": "Corrente istantanea immessa nel VE",
+                    "Current.Offered": "Massima corrente offerta al VE",
+                    "Energy.Active.Export.Register": "Energia attiva immessa in rete",
+                    "Energy.Active.Import.Register": "Energia attiva prelevata dalla rete",
+                    "Energy.Reactive.Export.Register": "Energia reattiva immessa in rete",
+                    "Energy.Reactive.Import.Register": "Energia reattiva prelevata dalla rete",
+                    "Energy.Active.Export.Interval": "Energia attiva immessa in rete nell'ultimo intervallo di campionamento",
+                    "Energy.Active.Import.Interval": "Energia attiva prelevata dalla rete nell'ultimo intervallo di campionamento",
+                    "Energy.Reactive.Export.Interval": "Energia reattiva immessa in rete nell'ultimo intervallo di campionamento",
+                    "Energy.Reactive.Import.Interval": "Energia reattiva prelevata dalla rete nell'ultimo intervallo di campionamento",
+                    "Frequency": "Frequenza di rete",
+                    "Power.Active.Export": "Potenza attiva istantanea prelevata dal VE",
+                    "Power.Active.Import": "Potenza attiva istantanea immessa nel VE",
+                    "Power.Factor": "Fattore di potenza istantaneo del flusso totale di energia",
+                    "Power.Offered": "Potenza massima offerta al VE",
+                    "Power.Reactive.Export": "Potenza reattiva istantanea prelevata dal VE",
+                    "Power.Reactive.Import": "Potenza reattiva istantanea immessa nel VE",
+                    "RPM": "Numero di giri al minuto della ventola di raffreddamento",
+                    "SoC": "Percentuale di ricarica del VE",
+                    "Temperature": "Temperatura interna del punto di ricarica",
+                    "Voltage": "Valore quadratico medio istantaneo della tensione CA"
+                }
+            }
+        },
+        "error": {
+            "auth": "Username e/o Password sbagliate.",
+            "measurand": "Grandezza sconosciuta"
+        },
+        "abort": {
+            "single_instance_allowed": "E' ammessa solo un'istanza per volta."
+        }
+    }
+}

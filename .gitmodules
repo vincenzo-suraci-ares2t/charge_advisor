@@ -1,3 +1,0 @@
-[submodule "custom_components/charge_advisor"]
-	path = custom_components/charge_advisor
-	url = https://github.com/vincenzo-suraci-ares2t/charge_advisor_core.git
