@@ -29,7 +29,7 @@ import homeassistant.helpers.config_validation as cv
 # Local packages
 # ----------------------------------------------------------------------------------------------------------------------
 
-from ocpp_central_system.ocpp_central_system.ComponentsV201.charging_station_2_0_1 import ChargingStationV201
+from ocpp_central_system.ComponentsV201.charging_station_2_0_1 import ChargingStationV201
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Local files
