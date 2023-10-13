@@ -30,8 +30,8 @@ from homeassistant.const import TIME_MINUTES as HA_TIME_MINUTES
 # Local packages
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .ocpp_central_system.ocpp_central_system.charging_station import ChargingStation
-from .ocpp_central_system.ocpp_central_system.ComponentsV201.evse_v201 import EVSE
+from ocpp_central_system.charging_station import ChargingStation
+from ocpp_central_system.ComponentsV201.evse_v201 import EVSE
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Local files
