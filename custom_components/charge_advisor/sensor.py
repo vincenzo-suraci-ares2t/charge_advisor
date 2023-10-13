@@ -48,6 +48,8 @@ SCAN_INTERVAL = timedelta(seconds=DEFAULT_METER_INTERVAL)
 
 # Questo insieme contiene gli stati del connettore che rendono i sensori dipsonibili nella plancia di HA
 CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET: Final = [
+    ChargePointStatus.preparing.value,
+    ChargePointStatus.finishing.value,
     ChargePointStatus.charging.value,
     ChargePointStatus.suspended_evse.value,
     ChargePointStatus.suspended_ev.value,
@@ -91,36 +93,39 @@ class OcppSensor:
                     )
                 )
 
-        for connector_id in range(1, charge_point.num_connectors + 1):            
-            for metric_key in list(HAConnectorSensors):
-                sensors.append(
-                    OcppSensorDescription(
-                        key=metric_key.lower(),
-                        name=metric_key.replace(".", " "),
-                        metric_key=metric_key,
-                        connector_id=connector_id,
+        if charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
+            for connector_id in range(1, charge_point.num_connectors + 1):
+                for metric_key in list(HAConnectorSensors):
+                    sensors.append(
+                        OcppSensorDescription(
+                            key=metric_key.lower(),
+                            name=metric_key.replace(".", " "),
+                            metric_key=metric_key,
+                            connector_id=connector_id,
+                        )
                     )
-                )
-            for metric_key in list(HAConnectorChargingSessionSensors):
-                sensors.append(
-                    OcppSensorDescription(
-                        key=metric_key.lower(),
-                        name=metric_key.replace(".", " "),
-                        metric_key=metric_key,
-                        connector_id=connector_id,
-                        availability_set=CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET,
+                for metric_key in list(HAConnectorChargingSessionSensors):
+                    sensors.append(
+                        OcppSensorDescription(
+                            key=metric_key.lower(),
+                            name=metric_key.replace(".", " "),
+                            metric_key=metric_key,
+                            connector_id=connector_id,
+                            availability_set=CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET,
+                        )
                     )
-                )
-            for metric_key in charge_point.measurands:
-                sensors.append(
-                    OcppSensorDescription(
-                        key=metric_key.lower(),
-                        name=metric_key.replace(".", " "),
-                        metric_key=metric_key,
-                        connector_id=connector_id,
-                        availability_set=CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET,
+                for metric_key in charge_point.measurands:
+                    sensors.append(
+                        OcppSensorDescription(
+                            key=metric_key.lower(),
+                            name=metric_key.replace(".", " "),
+                            metric_key=metric_key,
+                            connector_id=connector_id,
+                            availability_set=CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET,
+                        )
                     )
-                )
+        elif charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
+            pass
 
         entities = []
 
@@ -135,16 +140,19 @@ class OcppSensor:
                     )
                 )
             else:
-                connector = charge_point.get_connector_by_id(sensor.connector_id)
-                entities.append(
-                    ChargePointConnectorMetric(
-                        hass,
-                        central_system,
-                        charge_point,
-                        connector,
-                        sensor
+                if charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
+                    connector = charge_point.get_connector_by_id(sensor.connector_id)
+                    entities.append(
+                        ChargePointConnectorMetric(
+                            hass,
+                            central_system,
+                            charge_point,
+                            connector,
+                            sensor
+                        )
                     )
-                )
+                elif charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
+                    pass
 
         return entities
 
@@ -375,8 +383,10 @@ class ChargePointConnectorMetric(ChargePointMetric):
         charge_point: ChargePoint,
         connector: Connector,
         description: OcppSensorDescription,
+        evse: EVSE = None,
     ):
         super().__init__(hass, central_system, charge_point, description)
+        self._evse = evse
         self._connector = connector
         self._attr_unique_id = ".".join([
             SENSOR_DOMAIN,
@@ -387,7 +397,7 @@ class ChargePointConnectorMetric(ChargePointMetric):
         ])
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._connector.identifier)},
-            via_device=(DOMAIN, self._charge_point.id),
+            via_device=(DOMAIN, self._evse.id if evse is not None else charge_point),
         )
 
         # OcppLog.log_d(f"Adding {self._attr_unique_id} entity")
@@ -402,6 +412,48 @@ class ChargePointConnectorMetric(ChargePointMetric):
         available = False
         if self.entity_description.availability_set is not None:
             value = self._connector.get_metric_value(HAConnectorSensors.status.value)
+            if value in self.entity_description.availability_set:
+                available = super().available
+        else:
+            available = super().available
+        return available
+
+class EVSEConnectorMetric(ChargePointMetric):
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        central_system: CentralSystem,
+        charge_point: ChargePoint,
+        evse: EVSE,
+        description: OcppSensorDescription,
+    ):
+        super().__init__(hass, central_system, charge_point, description)
+        self._evse = evse
+        self._attr_unique_id = ".".join([
+            SENSOR_DOMAIN,
+            DOMAIN,
+            self._charge_point.id,
+            str(self._evse.id),
+            self.entity_description.key
+        ])
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self._evse.identifier)},
+            via_device=(DOMAIN, self._charge_point.id),
+        )
+
+        # OcppLog.log_d(f"Adding {self._attr_unique_id} entity")
+
+    @property
+    def target(self):
+        return self._evse
+
+    @property
+    def available(self) -> bool:
+        # Return if sensor is available
+        available = False
+        if self.entity_description.availability_set is not None:
+            value = self._evse.get_metric_value(HAEVSESensors.status.value)
             if value in self.entity_description.availability_set:
                 available = super().available
         else:

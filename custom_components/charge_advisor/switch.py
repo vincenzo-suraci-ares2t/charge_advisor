@@ -32,7 +32,7 @@ from ocpp.v16.enums import ChargePointStatus, Measurand, AvailabilityType
 # ----------------------------------------------------------------------------------------------------------------------
 
 from .const import DOMAIN, ICON
-from .enums import HAChargePointServices, HAChargePointSensors, HAConnectorSensors
+from .enums import HAChargePointServices, HAChargePointSensors, HAConnectorSensors, SubProtocol, HAEVSESensors
 from .logger import OcppLog
 
 # Switch configuration definitions
@@ -116,6 +116,36 @@ CHARGE_POINT_CONNECTOR_SWITCHES: Final = [
     ),
 ]
 
+CHARGE_POINT_EVSE_SWITCHES: Final = [
+    OcppSwitchDescription(
+        key="charge_control_evse",
+        name="Charge Control_evse",
+        icon=ICON,
+        on_action_service_name=HAChargePointServices.service_charge_start.name,
+        off_action_service_name=HAChargePointServices.service_charge_stop.name,
+        metric_key=HAEVSESensors.status.value,
+        metric_condition=[
+            ChargePointStatus.preparing.value,
+            ChargePointStatus.charging.value,
+            ChargePointStatus.suspended_evse.value,
+            ChargePointStatus.suspended_ev.value,
+        ],
+        default_state=False,
+    ),
+    OcppSwitchDescription(
+        key="availability_evse",
+        name="Availability_evse",
+        icon=ICON,
+        on_action_service_name=HAChargePointServices.service_availability.name,
+        off_action_service_name=HAChargePointServices.service_availability.name,
+        metric_key=HAEVSESensors.availability.value,
+        metric_condition=[
+            AvailabilityType.operative.value
+        ],
+        default_state=AvailabilityType.inoperative.value,
+    ),
+]
+
 
 async def async_setup_entry(hass, entry, async_add_devices):
     """Configure the switch platform."""
@@ -131,10 +161,16 @@ async def async_setup_entry(hass, entry, async_add_devices):
         charge_point = central_system.charge_points[cp_id]
         for ent in CHARGE_POINT_SWITCHES:
             entities.append(ChargePointSwitchEntity(central_system, charge_point, ent))
-        # Scorriamo i connettori del Charge Point        
-        for connector in charge_point.connectors:
-            for ent in CHARGE_POINT_CONNECTOR_SWITCHES:
-                entities.append(ChargePointConnectorSwitchEntity(central_system, charge_point, connector, ent))
+        if charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
+            # Scorriamo i connettori del Charge Point
+            for connector in charge_point.connectors:
+                for ent in CHARGE_POINT_CONNECTOR_SWITCHES:
+                    entities.append(ChargePointConnectorSwitchEntity(central_system, charge_point, connector, ent))
+        elif charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
+            # Scorrere gli EVSE del Charge Point e aggiungerli alle entità.
+            for evse in charge_point.evses:
+                for ent in CHARGE_POINT_EVSE_SWITCHES:
+                    entities.append(ChargePointEVSESwitchEntity(central_system, charge_point, evse, ent))
 
     # Aggiungiamo gli unique_id di ogni entità registrata in fase di setup al
     # Charge Point o al Connector
@@ -341,3 +377,34 @@ class ChargePointConnectorSwitchEntity(ChargePointSwitchEntity):
     @property
     def target(self):
         return self._connector
+
+class ChargePointEVSESwitchEntity(ChargePointSwitchEntity):
+    """Individual switch for charge point."""
+
+    _attr_has_entity_name = True
+    entity_description: OcppSwitchDescription
+
+    def __init__(
+        self,
+        central_system: CentralSystem,
+        charge_point: ChargePoint,
+        evse: EVSE,
+        description: OcppSwitchDescription,
+    ):
+        super().__init__(central_system, charge_point, description)
+        self._evse = evse
+        self._attr_unique_id = ".".join([
+            SWITCH_DOMAIN,
+            DOMAIN,
+            self._charge_point.id,
+            str(self._evse.id),
+            self.entity_description.key
+            ])
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self._evse.identifier)},
+            via_device=(DOMAIN, self._charge_point.id),
+        )
+
+    @property
+    def target(self):
+        return self._evse

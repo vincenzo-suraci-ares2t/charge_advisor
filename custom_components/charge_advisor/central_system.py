@@ -46,6 +46,8 @@ from .enums import HAChargePointServices
 from .logger import OcppLog
 from .config import *
 
+from .charge_point_v201 import HomeAssistantChargePointV201
+
 
 
 class HomeAssistantCentralSystem(ChargingStationManagementSystem, HomeAssistantEntityMetrics):
@@ -247,7 +249,29 @@ class HomeAssistantCentralSystem(ChargingStationManagementSystem, HomeAssistantE
             config_entry_id=self._config_entry.entry_id,
             identifiers={(DOMAIN, cp_id)},
             name=cp_id,
-            default_model="OCPP Charge Point",
+            model="OCPP Charge Point",
+            via_device=(DOMAIN, self._id),
+        )
+
+        return hacp
+
+    async def get_charge_point_instance_v201(self, cp_id, websocket):
+        # Create an instance of HomeAssistantChargePoint class
+        hacp = HomeAssistantChargePointV201(
+            cp_id,
+            websocket,
+            self._hass,
+            self._config_entry,
+            self
+        )
+
+        # Create Charge Point Device in Home Assistant
+        ha_dr = device_registry.async_get(self._hass)
+        ha_dr.async_get_or_create(
+            config_entry_id=self._config_entry.entry_id,
+            identifiers={(DOMAIN, cp_id)},
+            name=cp_id,
+            model="OCPP Charge Point",
             via_device=(DOMAIN, self._id),
         )
 

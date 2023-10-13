@@ -65,6 +65,12 @@ class HAChargePointSensors(str, Enum):
     data_transfer = ChargingStationStatus.data_transfer.value
     config_response = ChargingStationStatus.config_response.value
 
+class HAEVSESensors(str, Enum):
+    availability = EVSEStatus.availability.value
+    connectors = EVSEStatus.connectors.value
+    identifier = EVSEStatus.identifier.value
+    status = EVSEStatus.status.value
+
 class HAConnectorSensors(str, Enum):
     """Connector status conditions to report in home assistant."""
 

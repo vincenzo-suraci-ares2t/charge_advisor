@@ -33,7 +33,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 # ----------------------------------------------------------------------------------------------------------------------
 
 from .const import DOMAIN
-from .enums import HAChargePointServices
+from .enums import HAChargePointServices, SubProtocol
 
 
 @dataclass
@@ -80,10 +80,13 @@ async def async_setup_entry(hass, entry, async_add_devices):
 
         for ent in CHARGE_POINT_BUTTONS:
             entities.append(ChargePointButtonEntity(central_system, charge_point, ent))
-                
-        for connector in charge_point.connectors:            
-            for ent in CHARGE_POINT_CONNECTOR_BUTTONS:
-                entities.append(ChargePointConnectorButtonEntity(central_system, charge_point, connector, ent))
+
+        if charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
+            for connector in charge_point.connectors:
+                for ent in CHARGE_POINT_CONNECTOR_BUTTONS:
+                    entities.append(ChargePointConnectorButtonEntity(central_system, charge_point, connector, ent))
+        elif charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
+            pass
 
     # Aggiungiamo gli unique_id di ogni entità registrata in fase di setup al
     # Charge Point o al Connector
