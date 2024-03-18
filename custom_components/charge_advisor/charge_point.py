@@ -21,7 +21,7 @@ from ocpp.exceptions import NotImplementedError
 # ----------------------------------------------------------------------------------------------------------------------
 
 from homeassistant.components.persistent_notification import DOMAIN as PN_DOMAIN
-from homeassistant.const import STATE_OK, STATE_UNAVAILABLE, TIME_MINUTES
+from homeassistant.const import STATE_OK, STATE_UNAVAILABLE
 from homeassistant.helpers import device_registry, entity_component, entity_registry
 import homeassistant.helpers.config_validation as cv
 

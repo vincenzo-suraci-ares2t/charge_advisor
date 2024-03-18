@@ -21,10 +21,9 @@ from ocpp.exceptions import NotImplementedError
 # ----------------------------------------------------------------------------------------------------------------------
 
 from homeassistant.components.persistent_notification import DOMAIN as PN_DOMAIN
-from homeassistant.const import STATE_OK, STATE_UNAVAILABLE, TIME_MINUTES
+from homeassistant.const import STATE_OK, STATE_UNAVAILABLE, UnitOfTime
 from homeassistant.helpers import device_registry, entity_component, entity_registry
 import homeassistant.helpers.config_validation as cv
-from homeassistant.const import TIME_MINUTES as HA_TIME_MINUTES
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Local packages
@@ -32,6 +31,17 @@ from homeassistant.const import TIME_MINUTES as HA_TIME_MINUTES
 
 from ocpp_central_system.charging_station import ChargingStation
 from ocpp_central_system.ComponentsV201.evse_v201 import EVSE
+from ocpp_central_system.enums import ChargingStationStatus, EVSEStatus, ConnectorStatus
+
+from ocpp.v201 import call, call_result
+
+from ocpp.v201.datatypes import SetVariableDataType, ComponentType, VariableType, EVSEType
+from ocpp.v201.enums import (
+    AttributeType,
+    OperationalStatusType,
+    ChangeAvailabilityStatusType,
+    ConnectorStatusType
+)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Local files
@@ -114,15 +124,13 @@ class HomeAssistantEVSE(EVSE, HomeAssistantEntityMetrics):
         # Lista di entità Home Assistant registrate in fase di setup
         self.ha_entity_unique_ids: list[str] = []
 
-        # Instantiate an OCPP ChargePoint
+        # Istanziare la superclasse e le metriche.
         EVSE.__init__(self, charge_point, id)
         HomeAssistantEntityMetrics.__init__(self)
 
         # Impostiamo le metriche
         self.set_metric_value(HAEVSESensors.identifier.value, id)
 
-        # Lista di connettori
-        self._connectors: list[HomeAssistantConnectorV201] = []
 
     # ------------------------------------------------------------------------------------------------------------------
     # HOME ASSISTANT METHODS
@@ -146,6 +154,7 @@ class HomeAssistantEVSE(EVSE, HomeAssistantEntityMetrics):
         identifiers = {(DOMAIN, self.id)}
         OcppLog.log_d(f"Identificatori EVSE: {identifiers}.")
         evse_dev = dr.async_get_device(identifiers)
+        OcppLog.log_w(f"Entità registrate nell'EVSE: {self.ha_entity_unique_ids}.")
         for evse_ent in entity_registry.async_entries_for_device(er, evse_dev.id):
             OcppLog.log_d(f"Entità EVSE in esame: {evse_ent}")
             if evse_ent.unique_id not in self.ha_entity_unique_ids:
@@ -153,15 +162,18 @@ class HomeAssistantEVSE(EVSE, HomeAssistantEntityMetrics):
                 # source: https://dev-docs.home-assistant.io/en/dev/api/helpers.html#module-homeassistant.helpers.entity_registry
                 # OcppLog.log_d(f"La entità {cp_ent.unique_id} è registrata in Home Assistant ma non è stata configurata dalla integrazione: verrà eliminata.")
                 er.async_remove(evse_ent.entity_id)
+                OcppLog.log_w(f"Entità associata all'EVSE non trovata, rimozione...")
             else:
                 await entity_component.async_update_entity(self._hass, evse_ent.entity_id)
         for conn in self._connectors:
+            OcppLog.log_w(f"Tipo di connettore associato all'EVSE: {type(conn)}.")
             await conn.update_ha_entities()
 
         self._updating_entities = False
 
-    def is_available(self):
-        return self._status == STATE_OK
+    #def is_available(self):
+    #    return self._status == STATE_OK
+
 
     # ------------------------------------------------------------------------------------------------------------------
     # Event Loop Tasks
@@ -175,24 +187,41 @@ class HomeAssistantEVSE(EVSE, HomeAssistantEntityMetrics):
     # overridden
     async def get_connector_instance(self, connector_id):
         return HomeAssistantConnectorV201(
-            self._hass,
-            self,
-            connector_id
+            hass=self._hass,
+            charge_point=self.charge_point,
+            config_entry=self._config_entry,
+            evse_id=self.id,
+            connector_id=connector_id
         )
 
     # overridden
-    async def add_connector(self, connector_id):
+    def add_connector(self, connector_id = None):
+        # Creazione del dispositivo connettore.
+        conn = self.create_connector_instance(connector_id)
+        OcppLog.log_w(f"Aggiunta connettore al registro dispositivi...")
         dr = device_registry.async_get(self._hass)
-        conn = await super().add_connector(connector_id)
-        # Create Charge Point's Connector Devices
         dr.async_get_or_create(
             config_entry_id=self._config_entry.entry_id,
-            identifiers={(DOMAIN, conn.identifier)},
-            name=conn.identifier,
-            default_model=self.model + " Connector",
-            via_device=(DOMAIN, self.id),
-            manufacturer=self.vendor
+            identifiers={(DOMAIN, str(self._charge_point.id) + '_' + conn.identifier)},
+            name=str(self._charge_point.id) + '_' + conn.identifier,
+            model=self._charge_point.model + " Connector",
+            via_device=(DOMAIN, self.identifier),
+            manufacturer=self._charge_point.vendor
         )
+        OcppLog.log_w(f"Creazione di un connettore integrato di nome {str(self._charge_point.id) + '_' + conn.identifier}...")
+        # Creazione del Connettore integrato.
+        ha_conn = HomeAssistantConnectorV201(
+            hass=self._hass,
+            charge_point=self._charge_point,
+            connector_id=conn.connector_id,
+            config_entry=self._config_entry,
+            evse_id=self.id
+        )
+        OcppLog.log_w(f"Connettore integrato creato: {ha_conn}.")
+        OcppLog.log_w(f"Entità registrate nell'EVSE: {self.ha_entity_unique_ids}.")
+        self._connectors.append(ha_conn)
+
+        return ha_conn
 
     # overridden
     async def notify(self, msg: str, params={}):
@@ -234,7 +263,7 @@ class HomeAssistantEVSE(EVSE, HomeAssistantEntityMetrics):
 
     # overridden
     def get_default_session_time_uom(self):
-        return HA_TIME_MINUTES
+        return UnitOfTime.MINUTES
 
     # overridden
     def is_available_for_reservation(self):
@@ -246,17 +275,25 @@ class HomeAssistantEVSE(EVSE, HomeAssistantEntityMetrics):
 
 
     def is_available(self):
-        return self._charge_point.is_available()
+        return self._charge_point.is_available
 
+    ####################################################################################################################
+    # Metodo per gestire le istruzioni ricevute dall'interfaccia grafica.
     async def call_ha_service(
             self,
             service_name: str,
-            state: bool = True
+            state: bool = True,
+            connector_id: int = None
     ):
+        """match service_name:
+            case HAChargePointServices.service_availability.name:
+                if connector_id is not None:
+                    return await self.set_availability(state=state, connector_id=connector_id)"""
         return await self._charge_point.call_ha_service(
             service_name=service_name,
             state=state,
-            connector_id=self._connector_id,
-            transaction_id=self.active_transaction_id
+            evse_id=self.evse_id,
+            connector_id=connector_id,
+            transaction_id=self._active_transaction_id
         )
-
+    ####################################################################################################################

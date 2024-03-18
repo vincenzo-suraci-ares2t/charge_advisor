@@ -92,3 +92,7 @@ class HAConnectorChargingSessionSensors(str, Enum):
     energy_meter_start = ChargingSessionStatus.energy_meter_start.value
 
 
+class V201HAConnectorChargingSessionSensors(str, Enum):
+    HAConnectorChargingSessionSensors.__members__.items()
+    charging_connector = ChargingSessionStatus.charging_connector.value
+    charging_state = ChargingSessionStatus.charging_state.value

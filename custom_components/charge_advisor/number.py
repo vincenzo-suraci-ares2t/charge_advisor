@@ -19,7 +19,7 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     RestoreNumber,
 )
-from homeassistant.const import ELECTRIC_CURRENT_AMPERE
+from homeassistant.const import UnitOfElectricCurrent
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
@@ -55,11 +55,11 @@ NUMBERS: Final = [
         key="maximum_current",
         name="Maximum Current",
         icon=ICON,
-        initial_value=DEFAULT_MAX_CURRENT,
+        initial_value=0,
         native_min_value=0,
         native_max_value=DEFAULT_MAX_CURRENT,
         native_step=1,
-        native_unit_of_measurement=ELECTRIC_CURRENT_AMPERE,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
     ),
 ]
 
@@ -89,7 +89,12 @@ async def async_setup_entry(hass, entry, async_add_devices):
                         ent.native_max_value = entry.data.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT)
                     entities.append(ChargePointConnectorOcppNumber(hass, central_system, charge_point, connector, ent))
         elif charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
-            pass
+            for evse in charge_point.evses:
+                for ent in NUMBERS:
+                    if ent.key == "maximum_current":
+                        ent.initial_value = 0
+                        ent.native_max_value = entry.data.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT)
+                    entities.append(ChargePointConnectorOcppNumber(hass, central_system, charge_point, evse, ent))
 
     # Aggiungiamo gli unique_id di ogni entità registrata in fase di setup al
     # Charge Point o al Connector
@@ -148,7 +153,10 @@ class ChargePointOcppNumber(RestoreNumber, NumberEntity):
     @property
     def available(self) -> bool:
         # Return if sensor is available.
-        return self.target.is_available()
+        if self.target.is_available is None:
+            return False
+        else:
+            return self.target.is_available
 
     @callback
     def _schedule_immediate_update(self):
@@ -166,15 +174,26 @@ class ChargePointOcppNumber(RestoreNumber, NumberEntity):
     async def async_set_native_value(self, value):
         """Set new value."""
         num_value = int(value)
-        if self.target.is_available() and ((Profiles.SMART & self._charge_point.supported_features) or True) :
+        if self._charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
+            if self.target.is_available() and ((Profiles.SMART & self._charge_point.supported_features) or True) :
 
-            resp = await self.target.set_max_charge_rate(
-                limit_amps=num_value * 3
-            )
+                resp = await self.target.set_max_charge_rate(
+                    limit_amps=num_value * 3
+                )
 
-            if resp is True:
-                self._attr_native_value = num_value
-                self.async_write_ha_state()
+                if resp is True:
+                    self._attr_native_value = num_value
+                    self.async_write_ha_state()
+        elif self._charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
+            if self.target.is_available and self._charge_point.get_metric("SmartChargingCtrlr.Available"):
+
+                resp = await self.target.set_max_charge_rate(
+                    limit_amps=num_value * 3
+                )
+
+                if resp is True:
+                    self._attr_native_value = num_value
+                    self.async_write_ha_state()
 
     def append_entity_unique_id(self):
         if self.unique_id not in self.target.ha_entity_unique_ids:
@@ -206,3 +225,30 @@ class ChargePointConnectorOcppNumber(ChargePointOcppNumber):
     @property
     def target(self):
         return self._connector
+
+class ChargePointEVSEOcppNumber(ChargePointOcppNumber):
+
+    def __init__(
+            self,
+            hass: HomeAssistant,
+            central_system: CentralSystem,
+            charge_point: ChargePoint,
+            evse: EVSE,
+            description: OcppNumberDescription,
+    ):
+        super().__init__(hass, central_system, charge_point, description)
+        self._evse = evse
+        self._attr_unique_id = ".".join([
+            NUMBER_DOMAIN,
+            self._charge_point.id,
+            str(self._evse.id),
+            self.entity_description.key
+        ])
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self._connector.identifier)},
+            via_device=(DOMAIN, self._charge_point.id),
+        )
+
+    @property
+    def target(self):
+        return self._evse

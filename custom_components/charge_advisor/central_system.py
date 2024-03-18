@@ -242,7 +242,6 @@ class HomeAssistantCentralSystem(ChargingStationManagementSystem, HomeAssistantE
             self._config_entry,
             self
         )
-
         # Create Charge Point Device in Home Assistant
         ha_dr = device_registry.async_get(self._hass)
         ha_dr.async_get_or_create(
@@ -256,25 +255,29 @@ class HomeAssistantCentralSystem(ChargingStationManagementSystem, HomeAssistantE
         return hacp
 
     async def get_charge_point_instance_v201(self, cp_id, websocket):
+        OcppLog.log_w(f"Istanziazione di un Charge Point integrato...")
         # Create an instance of HomeAssistantChargePoint class
         hacp = HomeAssistantChargePointV201(
-            cp_id,
-            websocket,
-            self._hass,
-            self._config_entry,
-            self
+            id=cp_id,
+            connection=websocket,
+            hass=self._hass,
+            config_entry=self._config_entry,
+            central=self
         )
-
+        OcppLog.log_w(f"ID del Charge Point integrato appena istanziato: {cp_id}.")
+        OcppLog.log_w(f"Aggiunta del Charge Point integrato al registro dispositivi...")
         # Create Charge Point Device in Home Assistant
         ha_dr = device_registry.async_get(self._hass)
         ha_dr.async_get_or_create(
             config_entry_id=self._config_entry.entry_id,
             identifiers={(DOMAIN, cp_id)},
             name=cp_id,
-            model="OCPP Charge Point",
-            via_device=(DOMAIN, self._id),
+            # model=hacp.model,
+            model="OCPP 2.0.1 Charge Point",
+            via_device=(DOMAIN, self._id)
+            # manufacturer=hacp.vendor
         )
-
+        OcppLog.log_w(f"Aggiunta del Charge Point integrato al registro dispositivi completata.")
         return hacp
 
     async def call_ha_service(

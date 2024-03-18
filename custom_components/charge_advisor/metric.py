@@ -24,7 +24,7 @@ from ocpp_central_system.metric import *
 # ----------------------------------------------------------------------------------------------------------------------
 # Local files
 # ----------------------------------------------------------------------------------------------------------------------
-
+from .logger import OcppLog
 from .const import UNITS_OCCP_TO_HA
 
 
@@ -47,4 +47,4 @@ class HomeAssistantMetric(Metric):
     @property
     def ha_unit(self):
         """Get the home assistant unit of the metric."""
-        return UNITS_OCCP_TO_HA.get(self._unit, self._unit)
+        return UNITS_OCCP_TO_HA.get(self._unit, None)

@@ -16,7 +16,7 @@ import asyncio
 # ----------------------------------------------------------------------------------------------------------------------
 
 from homeassistant.helpers import device_registry, entity_component, entity_registry
-from homeassistant.const import TIME_MINUTES as HA_TIME_MINUTES
+from homeassistant.const import UnitOfTime
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Local packages
@@ -62,7 +62,7 @@ class HomeAssistantConnector(Connector, HomeAssistantEntityMetrics):
 
     # overridden
     def get_default_session_time_uom(self):
-        return HA_TIME_MINUTES
+        return UnitOfTime.MINUTES
 
     # overridden
     def is_available_for_reservation(self):

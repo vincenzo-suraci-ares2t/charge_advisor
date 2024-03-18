@@ -33,7 +33,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 # ----------------------------------------------------------------------------------------------------------------------
 
 from ocpp.v16.enums import ChargePointStatus
-from ocpp.v201.enums import OperationalStatusType, ConnectorStatusType
+from ocpp.v201.enums import ConnectorStatusType
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -130,7 +130,7 @@ class OcppSensor:
                     )
                 OcppLog.log_e(traceback.format_exc())
                 for metric_key in charge_point.measurands:
-                    OcppLog.log_e(f"Adding measurand .....{metric_key}")
+                    #OcppLog.log_e(f"Adding measurand .....{metric_key}")
                     sensors.append(
                         OcppSensorDescription(
                             key=metric_key,
@@ -425,8 +425,8 @@ class ChargePointMetric(RestoreSensor, SensorEntity):
     def state_class(self):
         # Return the state class of the sensor.
         state_class = None
-        OcppLog.log_w(f"Device Class del sensore {self._attr_name}: {self.device_class}.")
-        OcppLog.log_w(f"Unità di misura nativa di {self._attr_name}: {self.native_unit_of_measurement}.")
+        #OcppLog.log_w(f"Device Class del sensore {self._attr_name}: {self.device_class}.")
+        #OcppLog.log_w(f"Unità di misura nativa di {self._attr_name}: {self.native_unit_of_measurement}.")
         if self.device_class is SensorDeviceClass.ENERGY:
             state_class = SensorStateClass.TOTAL_INCREASING
         elif self.device_class in [
