@@ -31,6 +31,12 @@ from ocpp_central_system.const import *
 
 from .enums import HAChargePointSensors
 
+# Number of seconds to wait in case an Home Assistant element is already updating od adding its own entities
+HA_UPDATE_ENTITIES_WAITING_SECS = 1
+
+# Home Assistant Notify Title
+HA_NOTIFY_TITLE = "Charge Advisor"
+
 # Home Assistant Energy and Power UoM
 HA_ENERGY_UNIT = UnitOfMeasure.kwh.value
 HA_POWER_UNIT = UnitOfMeasure.kw.value
@@ -63,6 +69,7 @@ DEFAULT_CLASS_UNITS_HA = {
     SensorDeviceClass.BATTERY: ha.PERCENTAGE,
     SensorDeviceClass.POWER: ha.UnitOfPower.KILO_WATT,
     SensorDeviceClass.ENERGY: ha.UnitOfEnergy.KILO_WATT_HOUR,
+    SensorDeviceClass.DURATION: ha.UnitOfTime.SECONDS,
 }
 
 # Home Assistant to OCPP UoM mapping
@@ -105,6 +112,16 @@ DOMAIN = "charge_advisor"
 CONFIG = "config"
 ICON = "mdi:ev-station"
 
+# Material Design Icons (MDI)
+# source: https://pictogrammers.com/library/mdi/
+ICONS = {
+    "current-ac": "mdi:current-ac",
+    "current-dc": "mdi:current-dc",
+    "ev-station": "mdi:ev-station",
+    "sine-wave": "mdi:sine-wave",
+    "web": "mdi:web",
+}
+
 # source: https://pictogrammers.com/library/mdi/
 MEASURAND_ICON = {
     Measurand.energy_active_import_register.value: "mdi:lightning-bolt",
@@ -136,8 +153,6 @@ MEASURAND_ICON = {
     Measurand.soc.value: "mdi:battery-charging",
     Measurand.temperature.value: "mdi:ev-station",
 }
-
-# CA SERVER CONFIGURATION
 
 
 
