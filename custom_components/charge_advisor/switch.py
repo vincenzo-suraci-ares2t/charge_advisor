@@ -31,17 +31,18 @@ from ocpp.v201.enums import OperationalStatusType, ConnectorStatusType
 # Local packages
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .const import DOMAIN, ICON
-from .enums import HAChargePointServices, HAChargePointSensors, HAConnectorSensors, SubProtocol, HAEVSESensors
+from .const import DOMAIN, ICONS
+from .enums import HACentralSystemServices, HAChargePointServices, HAConnectorSensors, SubProtocol
 from .logger import OcppLog
 
 # Switch configuration definitions
 # At a minimum define switch name and on service call,
 # metric and condition combination can be used to drive switch state, use default to set initial state to True
 @dataclass
-class OcppSwitchDescription(SwitchEntityDescription):
+class OcppSwitchDescription(
+    SwitchEntityDescription
+):
     """Class to describe a Switch entity."""
-
     on_action_service_name: str | None = None
     off_action_service_name: str | None = None
     metric_key: str | None = None
@@ -51,19 +52,25 @@ class OcppSwitchDescription(SwitchEntityDescription):
 
 """
 Gli switch sono aggiunti "staticamente" dall'integrazione.
-Vengono aggiunti 2 switch:
-1) Availability > dovrebbe essere uno per ogni connettore!
-2) Charge_Control > dovrebbe essere uno per ogni connettore! 
+Vengono aggiunte le seguenti categorie switch:
+1) uno switch per dis/attivare la comunicazione (websocket) con la Central System (CS OCPP1.6J) ovvero con la Charging 
+   Station Central System (CSMS OCPP2.0.1)
+2) uno switch per dis/attivare la disponibilità di ogni Charging Point (CP OCPP 1.6J) o Charging Station (CS OCPP 2.0.1)
+3) uno switch per dis/attivare la disponibilità di ogni ESVE   
+4) uno switch per dis/attivare la disponibilità di ogni Connector
+5) uno switch per dis/attivare la ricarica (Charge_Control) di ogni Connettore OCPP 1.6 (connesso ad un CP)
+6) uno switch per dis/attivare la ricarica (Charge_Control) di ogni Connettore OCPP 2.0.1 (connesso ad un EVSE)
 """
+
 # Switch della Central System.
 CENTRAL_SYSTEM_SWITCHES: Final = [
     OcppSwitchDescription(
-        key="energy_control_communication",
-        name="EMS Communication",
-        icon=ICON,
-        on_action_service_name=HAChargePointServices.service_ems_communication_start.name, # service name (not value)
-        off_action_service_name=HAChargePointServices.service_ems_communication_stop.name, # service name (not value)
-        metric_key=HAChargePointServices.service_ems_communication_start.value,
+        key="charge_advisor_backend",
+        name="Charge Advisor Backend",
+        icon=ICONS["web"],
+        on_action_service_name=HACentralSystemServices.service_ems_communication_start.name, # service name (not value)
+        off_action_service_name=HACentralSystemServices.service_ems_communication_stop.name, # service name (not value)
+        metric_key=HACentralSystemServices.service_ems_communication_start.value,
         metric_condition=[
             True #Questa è hard coded per il momento, solo provvisorio
         ],
@@ -77,7 +84,7 @@ CHARGE_POINT_SWITCHES: Final = [
     OcppSwitchDescription(
         key="availability",
         name="Availability",
-        icon=ICON,
+        icon=ICONS["ev-station"],
         on_action_service_name=HAChargePointServices.service_availability.name, # service name (not value)
         off_action_service_name=HAChargePointServices.service_availability.name, # service name (not value)
         metric_key="ChargingStation.AvailabilityState",
@@ -95,7 +102,7 @@ CHARGE_POINT_CONNECTOR_SWITCHES: Final = [
     OcppSwitchDescription(
         key="charge_control",
         name="Charge Control",
-        icon=ICON,
+        icon=ICONS["ev-station"],
         on_action_service_name=HAChargePointServices.service_charge_start.name,
         off_action_service_name=HAChargePointServices.service_charge_stop.name,
         metric_key=HAConnectorSensors.status.value,
@@ -110,7 +117,7 @@ CHARGE_POINT_CONNECTOR_SWITCHES: Final = [
     OcppSwitchDescription(
         key="availability",
         name="Availability",
-        icon=ICON,
+        icon=ICONS["ev-station"],
         on_action_service_name=HAChargePointServices.service_availability.name,
         off_action_service_name=HAChargePointServices.service_availability.name,
         metric_key=HAConnectorSensors.availability.value,
@@ -126,7 +133,7 @@ CHARGE_POINT_EVSE_SWITCHES: Final = [
     OcppSwitchDescription(
         key="charge_control",
         name="Charge Control",
-        icon=ICON,
+        icon=ICONS["ev-station"],
         on_action_service_name=HAChargePointServices.service_charge_start.name,
         off_action_service_name=HAChargePointServices.service_charge_stop.name,
         metric_key="EVSE.AvailabilityState",
@@ -138,7 +145,7 @@ CHARGE_POINT_EVSE_SWITCHES: Final = [
     OcppSwitchDescription(
         key="availability",
         name="Availability",
-        icon=ICON,
+        icon=ICONS["ev-station"],
         on_action_service_name=HAChargePointServices.service_availability.name,
         off_action_service_name=HAChargePointServices.service_availability.name,
         metric_key="EVSE.AvailabilityState",
@@ -156,7 +163,7 @@ EVSE_CONNECTOR_SWITCHES: Final = [
     OcppSwitchDescription(
         key="availability",
         name="Availability",
-        icon=ICON,
+        icon=ICONS["ev-station"],
         on_action_service_name=HAChargePointServices.service_availability.name,
         off_action_service_name=HAChargePointServices.service_availability.name,
         metric_key="Connector.AvailabilityState",
@@ -176,14 +183,14 @@ async def async_setup_entry(hass, entry, async_add_devices):
     # Get the Central system instance
     central_system = hass.data[DOMAIN][entry.entry_id]    
 
-    entities = []
-    entities.append(CentralSystemSwitchEntity(central_system, CENTRAL_SYSTEM_SWITCHES[0]))
+    entities = [CentralSystemSwitchEntity(central_system, CENTRAL_SYSTEM_SWITCHES[0])]
+
     # Per ogni ID Charge Point...
     for cp_id in central_system.charge_points:
         # Recuperare il Charge Point vero e proprio.
         charge_point = central_system.charge_points[cp_id]
-        OcppLog.log_w(f"CHARGE POINT IN ESAME: {charge_point}.")
-        OcppLog.log_w(f"Tipo del charge point in esame: {type(charge_point)}.")
+        #OcppLog.log_i(f"CHARGE POINT IN ESAME: {charge_point}.")
+        #OcppLog.log_i(f"Tipo del charge point in esame: {type(charge_point)}.")
         # Per ogni switch da aggiungere al Charge Point.
         for desc in CHARGE_POINT_SWITCHES:
             # Creare un oggetto di tipo ChargePointSwitchEntity sulla base della descrizione che si trova nella
@@ -191,7 +198,7 @@ async def async_setup_entry(hass, entry, async_add_devices):
             entities.append(ChargePointSwitchEntity(central_system, charge_point, desc))
         # Se la versione di OCPP in uso è la 1.6...
         if charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
-            OcppLog.log_i(f"Versione protocollo OCPP: 1.6.")
+            #OcppLog.log_i(f"Versione protocollo OCPP: 1.6.")
             # Aggiungere i connettori direttamente al Charge Point.
             for connector in charge_point.connectors:
                 for ent in CHARGE_POINT_CONNECTOR_SWITCHES:
@@ -207,19 +214,20 @@ async def async_setup_entry(hass, entry, async_add_devices):
         # elif charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
         else:
             # Scorrere gli switch per gli EVSE del Charge Point e aggiungerli alle entità.
-            OcppLog.log_i(f"Versione protocollo OCPP: 2.0.1.")
-            OcppLog.log_i(f"EVSE disponibili: {charge_point.evses}.")
+            #OcppLog.log_i(f"Versione protocollo OCPP: 2.0.1.")
+            #OcppLog.log_i(f"EVSE disponibili: {charge_point.evses}.")
             # Per ogni EVSE...
             for evse in charge_point.evses:
-                OcppLog.log_w(f"EVSE in esame: {evse}.")
-                OcppLog.log_w(f"Tipo dell'EVSE in esame: {type(evse)}.")
+
+                #OcppLog.log_w(f"EVSE in esame: {evse}.")
+                #OcppLog.log_w(f"Tipo dell'EVSE in esame: {type(evse)}.")
                 # Per ogni switch da aggiungere all'EVSE...
                 # OcppLog.log_w(f"Descrizioni di switch disponibili per gli EVSE: {CHARGE_POINT_EVSE_SWITCHES}")
                 for desc in CHARGE_POINT_EVSE_SWITCHES:
-                    OcppLog.log_w(f"Nome switch in esame: {desc.name}. Per EVSE {evse.id} con identificatore {evse.identifier}.")
+                    #OcppLog.log_w(f"Nome switch in esame: {desc.name}. Per EVSE {evse.id} con identificatore {evse.identifier}.")
                     # Inserire lo switch tra le entità dell'EVSE, usando la descrizione fornita dalla lista
                     # CHARGE_POINT_EVSE_SWITCHES per creare un oggetto di tipo EVSESwitchEntity.
-                    OcppLog.log_w(f"Inserimento switch EVSE...")
+                    #OcppLog.log_w(f"Inserimento switch EVSE...")
                     entities.append(
                         EVSESwitchEntity(
                             central_system,
@@ -228,31 +236,32 @@ async def async_setup_entry(hass, entry, async_add_devices):
                             desc
                         )
                     )
-                    # Aggiungere gli switch dei connettori relativi all'EVSE in esame.
-                    for connector in evse.connectors:
-                        OcppLog.log_w(f"Connector in esame: {connector}.")
-                        for conn_desc in EVSE_CONNECTOR_SWITCHES:
-                            OcppLog.log_w(f"Descrizione switch per connector: {conn_desc}.")
-                            entities.append(
-                                EVSEConnectorSwitchEntity(
-                                    central_system,
-                                    charge_point,
-                                    evse,
-                                    connector,
-                                    conn_desc
-                                )
-                            )
 
-    OcppLog.log_w(f"Entità switch aggiunte: {entities}.")
+                # Aggiungere gli switch dei connettori relativi all'EVSE in esame.
+                for connector in evse.connectors:
+                    #OcppLog.log_w(f"Connector in esame: {connector}.")
+                    for conn_desc in EVSE_CONNECTOR_SWITCHES:
+                        #OcppLog.log_w(f"Descrizione switch per connector: {conn_desc}.")
+                        entities.append(
+                            EVSEConnectorSwitchEntity(
+                                central_system,
+                                charge_point,
+                                evse,
+                                connector,
+                                conn_desc
+                            )
+                        )
+
+    #OcppLog.log_i(f"Entità switch aggiunte: {entities}.")
     # Aggiungiamo gli unique_id di ogni entità registrata in fase di setup al
     # Charge Point o al Connector
     for entity in entities:
         entity.append_entity_unique_id()
-        OcppLog.log_w(f"Entità aggiunta e suo ID: {entity.name}, {entity.entity_id}.")
-        OcppLog.log_w(f"Tipo entità aggiunta: {type(entity)}.")
+        #OcppLog.log_i(f"Entità aggiunta e suo ID: {entity.name}, {entity.entity_id}.")
+        #OcppLog.log_i(f"Tipo entità aggiunta: {type(entity)}.")
 
     async_add_devices(entities, False)
-    OcppLog.log_w(f"Inserimento terminato.")
+    #OcppLog.log_i(f"Inserimento terminato.")
 
 class CentralSystemSwitchEntity(SwitchEntity):
     _attr_has_entity_name = True
@@ -276,10 +285,10 @@ class CentralSystemSwitchEntity(SwitchEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._central_system.id)}
         )
-        # OcppLog.log_d(f"{self._attr_unique_id} switch created!")
-        OcppLog.log_w(f"Central system ID: {self._central_system.id}.")
-        OcppLog.log_w(f"Tipo central system in esame: {type(self._central_system)}.")
-        OcppLog.log_w(f"Central System attr_unique_id: {self._attr_unique_id}.")
+        #OcppLog.log_d(f"{self._attr_unique_id} switch created!")
+        #OcppLog.log_d(f"Central system ID: {self._central_system.id}.")
+        #OcppLog.log_d(f"Tipo central system in esame: {type(self._central_system)}.")
+        #OcppLog.log_d(f"Central System attr_unique_id: {self._attr_unique_id}.")
 
     @property
     def target(self):
@@ -487,9 +496,9 @@ class EVSESwitchEntity(ChargePointSwitchEntity):
             identifiers={(DOMAIN, self._evse.identifier)},
             #via_device=(DOMAIN, self._charge_point.id),
         )
-        OcppLog.log_w(f"EVSE VIA DEVICE: ({DOMAIN}, {self._charge_point.id}).")
-        OcppLog.log_w(f"EVSE ID attr_unique_id: {self._attr_unique_id}.")
-        OcppLog.log_w(f"EVSE description key: {self.entity_description.key}.")
+        #OcppLog.log_w(f"EVSE VIA DEVICE: ({DOMAIN}, {self._charge_point.id}).")
+        #OcppLog.log_w(f"EVSE ID attr_unique_id: {self._attr_unique_id}.")
+        #OcppLog.log_w(f"EVSE description key: {self.entity_description.key}.")
 
     @property
     def target(self):
@@ -572,19 +581,12 @@ class EVSEConnectorSwitchEntity(EVSESwitchEntity):
         self._attr_unique_id = ".".join([
             SWITCH_DOMAIN,
             DOMAIN,
-            self._charge_point.id,
-            self._evse.identifier,
-            str(self._connector.identifier),
+            self._connector.identifier,
             self.entity_description.key
             ])
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._connector.identifier)},
-            #via_device=(DOMAIN, self._evse.identifier),
+            identifiers={(DOMAIN, self._connector.identifier)}
         )
-        OcppLog.log_w(f"TIPO CONNECTOR: {type(self.target)}.")
-        OcppLog.log_w(f"Connector VIA DEVICE: ({DOMAIN}, {self._evse.identifier}).")
-        OcppLog.log_w(f"Connector ID attr_unique_id: {self._attr_unique_id}.")
-        OcppLog.log_w(f"Connector description key: {self.entity_description.key}.")
 
     @property
     def target(self):
@@ -596,8 +598,8 @@ class EVSEConnectorSwitchEntity(EVSESwitchEntity):
         return self.target.is_available
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        OcppLog.log_w(f"SWITCH CONNECTOR TURN OFF")
-        OcppLog.log_w(f"self.entity_description.off_action_Service_name: {self.entity_description.off_action_service_name}.")
+        #OcppLog.log_w(f"SWITCH CONNECTOR TURN OFF")
+        #OcppLog.log_w(f"self.entity_description.off_action_Service_name: {self.entity_description.off_action_service_name}.")
         # Turn the switch off.
         """Response is True if successful but State is False"""
         if self.entity_description.off_action_service_name is None:
@@ -614,8 +616,8 @@ class EVSEConnectorSwitchEntity(EVSESwitchEntity):
         self._state = not resp
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        OcppLog.log_w(f"SWITCH CONNECTOR TURN ON")
-        OcppLog.log_w(f"self.entity_description.on_action_Service_name: {self.entity_description.on_action_service_name}.")
+        #OcppLog.log_w(f"SWITCH CONNECTOR TURN ON")
+        #OcppLog.log_w(f"self.entity_description.on_action_Service_name: {self.entity_description.on_action_service_name}.")
         # Turn the switch on.
         self._state = await self.target.call_ha_service(
             service_name=self.entity_description.on_action_service_name,

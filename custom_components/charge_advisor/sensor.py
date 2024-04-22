@@ -27,6 +27,7 @@ from homeassistant.components.sensor import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+import homeassistant.const as ha
 
 # ----------------------------------------------------------------------------------------------------------------------
 # External packages
@@ -77,15 +78,44 @@ class OcppSensorDescription(SensorEntityDescription):
     availability_set: list | None = None
     extra_attributes: dict | None =  field(default_factory=dict)
     visible_by_default: bool | None = False
+    native_uom: str | None = None
+    native_value: any | None = None
 
 
 class OcppSensor:
 
+    # Aggiornamento del 09/04/2024
+    # Utilizzare questo metodo per attribuire a specifiche metriche delle unità di misura di default personalizzate
     @staticmethod
-    def get_charge_point_entities(hass, charge_point: ChargePoint):
+    def get_native_uom_by_metric_key(metric_key):
+        native_uom = None
+        match metric_key:
+            case [ HAChargePointSensors.latency_ping, HAChargePointSensors.latency_pong ]:
+                native_uom = ha.UnitOfTime.MILLISECONDS
+                OcppLog.log_d(f"Debug >>> Unità di misura di {metric_key}: {native_uom}")
+        return native_uom
 
-        central_system = charge_point.central
+    # Aggiornamento del 09/04/2024
+    # Utilizzare questo metodo per attribuire a specifiche metriche dei valori di default personalizzati
+    @staticmethod
+    def get_native_value_by_metric_key(metric_key):
+        return None
 
+    # Metodo per il recupero delle entità di tipo Sensore per uno specifico Charge Point
+    @staticmethod
+    def get_charge_point_entities(
+        hass,
+        charge_point: ChargePoint
+    ):
+
+        # Recupero della Central System
+        central_system = charge_point.central_system
+
+        # --------------------------------------------------------------------------------------------------------------
+        # Sensori associati al Charge Point
+        # --------------------------------------------------------------------------------------------------------------
+
+        # Array contenente tutti i sensori che dovranno essere registrati in Home Assistant
         sensors = []
 
         for metric_key in list(HAChargePointSensors):
@@ -96,6 +126,8 @@ class OcppSensor:
                         name=metric_key.replace(".", " "),
                         metric_key=metric_key,
                         entity_category=EntityCategory.DIAGNOSTIC,
+                        native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
+                        native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                     )
                 )
             else:
@@ -104,8 +136,14 @@ class OcppSensor:
                         key=metric_key.lower(),
                         name=metric_key.replace(".", " "),
                         metric_key=metric_key,
+                        native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
+                        native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                     )
                 )
+
+        # --------------------------------------------------------------------------------------------------------------
+        # Sensori associati a ciascun Connettore del Charge Point - OCPP 1.6
+        # --------------------------------------------------------------------------------------------------------------
 
         if charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
             for connector_id in range(1, charge_point.num_connectors + 1):
@@ -116,6 +154,8 @@ class OcppSensor:
                             name=metric_key.replace(".", " "),
                             metric_key=metric_key,
                             connector_id=connector_id,
+                            native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
+                            native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                         )
                     )
                 for metric_key in list(HAConnectorChargingSessionSensors):
@@ -126,11 +166,15 @@ class OcppSensor:
                             metric_key=metric_key,
                             connector_id=connector_id,
                             availability_set=CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET,
+                            native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
+                            native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                         )
                     )
-                OcppLog.log_e(traceback.format_exc())
                 for metric_key in charge_point.measurands:
-                    #OcppLog.log_e(f"Adding measurand .....{metric_key}")
+                    #OcppLog.log_w(f"Adding measurand "
+                    #              f"{metric_key} to Connector #"
+                    #              f"{connector_id} of Charge Point "
+                    #              f"{charge_point.id}")
                     sensors.append(
                         OcppSensorDescription(
                             key=metric_key,
@@ -138,13 +182,20 @@ class OcppSensor:
                             metric_key=metric_key,
                             connector_id=connector_id,
                             availability_set=CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET,
+                            native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
+                            native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                         )
                     )
+
+        # --------------------------------------------------------------------------------------------------------------
+        # Sensori associati a ciascun Connettore di ciascun EVSE del Charging Station - OCPP 2.0.1
+        # --------------------------------------------------------------------------------------------------------------
+
         elif charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
 
             def create_sensors_from_include_components(include_components_obj, sensors):
                 components_list = include_components_obj.componentsList
-                OcppLog.log_e(f"Lista dei components... {components_list}")
+                #OcppLog.log_e(f"Lista dei components... {components_list}")
                 for component_name in components_list:
 
                     component = include_components_obj.get_component(component_name)
@@ -159,8 +210,7 @@ class OcppSensor:
 
                             for variable_attribute_type in variable.variable_attributes:
 
-
-                                metric_key = component._component_tier.compose_metric_key(
+                                metric_key = component.tier.compose_metric_key(
                                     component_name=component_name,
                                     component_instance=component.instance,
                                     variable_name=variable.name,
@@ -168,25 +218,23 @@ class OcppSensor:
                                     attribute_type=variable_attribute_type
                                 )
 
-                                match component._component_tier.tier_level:
+                                match component.tier.tier_level:
                                     case TierLevel.ChargingStation:
                                         connector_id = None
                                         evse_id = None
                                     case TierLevel.EVSE:
                                         connector_id = None
-                                        evse_id = component._component_tier.evse_id
+                                        evse_id = component.tier.id
                                     case TierLevel.Connector:
-                                        connector_id = component._component_tier.connector_id
-                                        evse_id = component._component_tier.evse_id
-
-                                        OcppLog.log_d(f"Adding to Connector ID {connector_id} on EVSE {evse_id}")
+                                        connector_id = component.tier.id
+                                        evse_id = component.tier.evse_id
+                                        #OcppLog.log_d(f"Adding to Connector ID {connector_id} on EVSE {evse_id}")
                                     case _:
                                         connector_id = None
                                         evse_id = None
 
 
                                 if "Ctrlr" not in component_name:
-
                                     sensors.append(
                                         OcppSensorDescription(
                                             key=metric_key.lower(),
@@ -195,30 +243,27 @@ class OcppSensor:
                                             metric_key=metric_key,
                                             connector_id=connector_id,
                                             evse_id=evse_id,
-                                            entity_category=EntityCategory.DIAGNOSTIC
+                                            entity_category=EntityCategory.DIAGNOSTIC,
+                                            native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
+                                            native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                                         )
                                     )
 
             def create_sensors_from_tier_level(tier_level, sensors):
 
+                connector_id = None
+                evse_id = None
+
                 match tier_level.tier_level:
-                    case TierLevel.ChargingStation:
-                        connector_id = None
-                        evse_id = None
                     case TierLevel.EVSE:
-                        connector_id = None
-                        evse_id = tier_level.evse_id
+                        evse_id = tier_level.id
                     case TierLevel.Connector:
                         connector_id = tier_level.connector_id
-                        evse_id = tier_level.evse_id
-
-                        OcppLog.log_d(f"Adding to Connector ID {connector_id} on EVSE {evse_id}")
-                    case _:
-                        connector_id = None
-                        evse_id = None
+                        evse_id = tier_level.id
+                        #OcppLog.log_d(f"Adding Connector ID {connector_id} on EVSE {evse_id}")
 
                 for metric_key in tier_level.measurands_list:
-                    OcppLog.log_e(f"Adding measurand .....{metric_key}")
+                    #OcppLog.log_e(f"Adding measurand .....{metric_key}")
                     sensors.append(
                         OcppSensorDescription(
                             key=metric_key.lower(),
@@ -226,6 +271,8 @@ class OcppSensor:
                             metric_key=metric_key,
                             evse_id=evse_id,
                             availability_set=V201_CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET,
+                            native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
+                            native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                         )
                     )
 
@@ -234,7 +281,7 @@ class OcppSensor:
 
             evse_sensors = set(list(V201HAConnectorChargingSessionSensors)) | set(list(HAConnectorChargingSessionSensors))
             for evse in charge_point.evses:
-                OcppLog.log_e(f"Adding evseeeee {evse}")
+                #OcppLog.log_e(f"Adding evseeeee {evse}")
                 create_sensors_from_include_components(evse, sensors)
                 create_sensors_from_tier_level(evse, sensors)
                 for metric_key in list(evse_sensors):
@@ -243,17 +290,19 @@ class OcppSensor:
                             key=metric_key.lower(),
                             name=metric_key.replace(".", " "),
                             metric_key=metric_key,
-                            evse_id=evse.evse_id,
+                            evse_id=evse.id,
                             availability_set=V201_CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET,
+                            native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
+                            native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                         )
                     )
                 for connector in evse.connectors:
                     create_sensors_from_include_components(connector, sensors)
                     create_sensors_from_tier_level(connector, sensors)
 
-
-
-
+        # --------------------------------------------------------------------------------------------------------------
+        # Entità associate ai sensori del Charge Point
+        # --------------------------------------------------------------------------------------------------------------
 
         entities = []
 
@@ -317,12 +366,16 @@ class OcppSensor:
                             sensor,
                         )
                     )
+
         return entities
 
 
-#  Static Sensor Platform entities registration done at CONFIG TIME (not at RUNTIME)
+# Static Sensor Platform entities registration done at CONFIG TIME (not at RUNTIME)
 # A workaround to do it at runtime: https://community.home-assistant.io/t/adding-entities-at-runtime/200855/2
 async def async_setup_entry(hass, entry, async_add_devices):
+
+    #OcppLog.log_i("Sensor async_setup_entry called!")
+
     # Configure the sensor platform
     central_system: CentralSystem = hass.data[DOMAIN][entry.entry_id]
 
@@ -373,8 +426,8 @@ class ChargePointMetric(RestoreSensor, SensorEntity):
             identifiers={(DOMAIN, self._charge_point.id)},
             via_device=(DOMAIN, self._central_system.id),
         )
-        self._attr_native_unit_of_measurement = None
-        self._attr_native_value = None
+        self._attr_native_unit_of_measurement = description.native_uom
+        self._attr_native_value = description.native_value
         self._visible_by_default = self.entity_description.visible_by_default
 
     @property
@@ -474,26 +527,28 @@ class ChargePointMetric(RestoreSensor, SensorEntity):
             device_class = SensorDeviceClass.CURRENT
         elif mk.startswith("voltage"):
             device_class = SensorDeviceClass.VOLTAGE
-        elif mk.startswith("energy.") and not mk.startswith("energy.reactive"):
+        elif mk.startswith("energy."):
             device_class = SensorDeviceClass.ENERGY
         elif self._metric_key in [
-            Measurand.frequency.value,
-            Measurand.rpm.value,
-        ] or mk.startswith("frequency"):
+                Measurand.frequency.value,
+                Measurand.rpm.value,
+            ] or mk.startswith("frequency"):
             device_class = SensorDeviceClass.FREQUENCY
-        elif mk.startswith(tuple(["power.active", "power.offered"])) and not mk.startswith("power.reactive"):
+        elif mk.startswith(tuple(["power.active", "power.offered"])):
             device_class = SensorDeviceClass.POWER
+        elif mk.startswith("power.reactive"):
+            device_class = SensorDeviceClass.REACTIVE_POWER
         elif mk.startswith("temperature."):
             device_class = SensorDeviceClass.TEMPERATURE
-        elif mk.startswith("session.time"):
+        elif mk.startswith("session.time") or mk.startswith("latency"):
             device_class = SensorDeviceClass.DURATION
         elif mk.startswith("session.energy"):
             device_class = SensorDeviceClass.ENERGY
         elif mk.startswith("timestamp.") or self._metric_key in [
-            HAChargePointSensors.config_response.value,
-            HAChargePointSensors.data_response.value,
-            HAChargePointSensors.heartbeat.value,
-        ]:
+                HAChargePointSensors.config_response.value,
+                HAChargePointSensors.data_response.value,
+                HAChargePointSensors.heartbeat.value,
+            ]:
             device_class = SensorDeviceClass.TIMESTAMP
         elif mk.startswith("soc"):
             device_class = SensorDeviceClass.BATTERY
@@ -515,7 +570,6 @@ class ChargePointMetric(RestoreSensor, SensorEntity):
         # Return the native unit of measurement.
         uom = self.target.get_metric_ha_unit(self._metric_key)
         if uom is not None:
-
             self._attr_native_unit_of_measurement = uom
         else:
             self._attr_native_unit_of_measurement = DEFAULT_CLASS_UNITS_HA.get(
@@ -656,17 +710,15 @@ class EVSEConnectorMetric(EVSEMetric):
             SENSOR_DOMAIN,
             DOMAIN,
             self._charge_point.id,
-            str(self._evse.evse_id),
+            str(self._evse.id),
             str(self._connector.connector_id),
             self.entity_description.key
         ])
-        OcppLog.log_e(f"Adding Connector sensor {self._attr_unique_id} with identifier {self._connector.identifier} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        #OcppLog.log_e(f"Adding Connector sensor {self._attr_unique_id} with identifier {self._connector.identifier}")
         self._extra_attr = self.entity_description.extra_attributes
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._connector.identifier)},
-            #via_device=(DOMAIN, self._evse.evse_id),
+            identifiers={(DOMAIN, self._connector.identifier)}
         )
-
         # OcppLog.log_d(f"Adding {self._attr_unique_id} entity")
 
     @property

@@ -2,8 +2,8 @@
     "config": {
         "step": {
             "user": {
-                "title": "OCPP Configuratie",
-                "description": "Voor hulp bij configuratie zie: https://github.com/lbbrhzn/ocpp",
+                "title": "Charge Advisor Configuratie",
+                "description": "Voor hulp bij configuratie zie: https://github.com/vincenzo-suraci-ares2t/charge_advisor/wiki",
                 "data": {
                     "host": "Host",
                     "port": "Poort",

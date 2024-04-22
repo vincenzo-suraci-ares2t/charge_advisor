@@ -2,8 +2,8 @@
     "config": {
         "step": {
             "user": {
-                "title": "OCPP Configuration",
-                "description": "If you need help with the configuration have a look here: https://github.com/lbbrhzn/ocpp",
+                "title": "Charge Advisor Configuration",
+                "description": "If you need help with the configuration have a look here: https://github.com/vincenzo-suraci-ares2t/charge_advisor/wiki",
                 "data": {
                     "host": "Central system host address",
                     "port": "Central system port number",

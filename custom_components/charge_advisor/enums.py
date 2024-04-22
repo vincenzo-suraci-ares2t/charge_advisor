@@ -22,14 +22,14 @@ from ocpp_central_system.enums import *
 # Local files
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-
-class HAChargePointServices(str, Enum):
-    """Charger status conditions to report in home assistant."""
-
-    # For HA service reference and for function to call use .value
+class HACentralSystemServices(str, Enum):
     service_ems_communication_start = "ems_communication_start"
     service_ems_communication_stop = "ems_communication_stop"
+
+class HAChargePointServices(str, Enum):
+    """Charging Station status conditions to report in home assistant."""
+
+    # For HA service reference and for function to call use .value
     service_charge_start = "start_transaction"
     service_charge_stop = "stop_transaction"
     service_availability = "availability"

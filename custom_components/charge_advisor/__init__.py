@@ -1,31 +1,98 @@
-"""Custom integration for Chargers that support the Open Charge Point Protocol."""
+"""Charge Advisor integration for Charging Stations that support the Open Charge Point Protocol v1.6 or v2.0.1"""
 # ----------------------------------------------------------------------------------------------------------------------
 # Python packages
 # ----------------------------------------------------------------------------------------------------------------------
 
 import asyncio
 import logging
-import logging
 import subprocess
-import sys
+import platform
+from distutils.version import LooseVersion
 
+# ----------------------------------------------------------------------------------------------------------------------
 # Importing dinamico del package ocpp-central-system
+# ----------------------------------------------------------------------------------------------------------------------
 from .config import *
 if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
+    # ------------------------------------------------------------------------------------------------------------------
+    # PRODUCTION
+    # ------------------------------------------------------------------------------------------------------------------
+    args = [
+        "apk add --update --no-cache --virtual .tmp-build-deps gcc libc-dev linux-headers postgresql-dev",
+        "apk add libffi-dev"
+    ]
+    sub_proc = subprocess.run(
+        args=args,
+        shell=True,
+        capture_output=True
+    )
+    if sub_proc.returncode == 0:
+        logging.info(sub_proc)
+    else:
+        logging.error(sub_proc)
     # Installazione del package ocpp_central_system da bitbucket con chiave privata
     # Path assoluto alla chiave per accedere al repository di ocpp_central_system
     key_path = "/config/ssh-keys/ocpp-central-system-key"
     # Url al repository git (bitbucket) di ocpp_central_system
     package_url = "git+ssh://git@bitbucket.org/a2t-smartcity/ocpp-central-system.git"
-    logging.error(subprocess.run([f"apk add --update --no-cache --virtual .tmp-build-deps \
-        gcc libc-dev linux-headers postgresql-dev \
-        && apk add libffi-dev"], shell=True, capture_output=True))
-    logging.error(subprocess.run([f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade"], shell=True, capture_output=True))
+    args = [
+        "eval `ssh-agent -s` ",
+        f"ssh-add {key_path}" +
+        "ssh -o StrictHostKeyChecking=no -T git@bitbucket.org",
+        f"pip install {package_url} --upgrade"
+    ]
+    sub_proc = subprocess.run(
+        args=args,
+        shell=True,
+        capture_output=True
+    )
+    if sub_proc.returncode == 0:
+        logging.info(sub_proc)
+    else:
+        logging.error(sub_proc)
 elif INTEGRATION_TYPE == INTEGRATION_TYPE_DEV:
-    # Installazione del package da locale, solo debug
-    # Path alla directory locale di ocpp_central_system
+    # ------------------------------------------------------------------------------------------------------------------
+    # DEVELOPER
+    # ------------------------------------------------------------------------------------------------------------------
+    # Aggiornamento del 08/04/2024
+    # Dalla versione di python 3.12 il comando pip è deprecato e può dare questo errore:
+    # AttributeError: module 'pkgutil' has no attribute 'ImpImporter'. Did you mean: 'zipimporter'?
+    # La soluzione è descritta in questo articolo:
+    # source: https://ubuntuhandbook.org/index.php/2023/10/fix-broken-pip-python-312-ubuntu/
+    # Installazione del package da locale, modalità DEV
+    pip_command = "pip"
+    # Ottieni la versione corrente di Python
+    versione_python = platform.python_version()
+    # Confronta la versione corrente con 3.12
+    if LooseVersion(versione_python) >= LooseVersion('3.12'):
+        args = [
+            "python3.12 -m ensurepip --upgrade"
+        ]
+        sub_proc = subprocess.run(
+            args=args,
+            shell=True,
+            capture_output=True
+        )
+        if sub_proc.returncode == 0:
+            logging.info(sub_proc)
+            pip_command = "python3.12 -m pip"
+        else:
+            logging.error(sub_proc)
     local_package_name = "./custom_components/charge_advisor/ocpp_central_system"
-    logging.error(subprocess.run([f"pip install --upgrade --force-reinstall -e {local_package_name}"], shell=True, capture_output=True))
+    args = [
+        f"{pip_command} install --upgrade --force-reinstall -e {local_package_name}"
+    ]
+    sub_proc = subprocess.run(
+        args=args,
+        shell=True,
+        capture_output=True
+    )
+    if sub_proc.returncode == 0:
+        logging.info(sub_proc)
+    else:
+        logging.error(sub_proc)
+else:
+    logging.error("Invalid INTEGRATION_TYPE: " + INTEGRATION_TYPE)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Home Assistant packages
@@ -53,7 +120,7 @@ from ocpp.v16.enums import AuthorizationStatus
 # Local files
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .central_system import HomeAssistantCentralSystem
+from .ha_central_system import HomeAssistantCentralSystem
 from .const import *
 
 
