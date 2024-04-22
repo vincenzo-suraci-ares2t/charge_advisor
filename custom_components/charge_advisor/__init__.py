@@ -36,10 +36,7 @@ if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
     # Url al repository git (bitbucket) di ocpp_central_system
     package_url = "git+ssh://git@bitbucket.org/a2t-smartcity/ocpp-central-system.git"
     args = [
-        "eval `ssh-agent -s` ",
-        f"ssh-add {key_path}" +
-        "ssh -o StrictHostKeyChecking=no -T git@bitbucket.org",
-        f"pip install {package_url} --upgrade"
+        f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade"
     ]
     sub_proc = subprocess.run(
         args=args,
