@@ -378,11 +378,7 @@ class ChargePointSwitchEntity(SwitchEntity):
 
     @property
     def available(self) -> bool:
-        # Return if sensor is available.
-        if self.target.is_available is None:
-            return False
-        else:
-            return self.target.is_available
+        return self.target.is_available()
 
     @property
     def is_on(self) -> bool:
@@ -507,7 +503,7 @@ class EVSESwitchEntity(ChargePointSwitchEntity):
     @property
     def available(self) -> bool:
         # Return if switch is available.
-        return self.target.is_available
+        return self.target.is_available()
 
     @property
     def is_on(self) -> bool:
@@ -595,7 +591,7 @@ class EVSEConnectorSwitchEntity(EVSESwitchEntity):
     @property
     def available(self) -> bool:
         # Return if switch is available.
-        return self.target.is_available
+        return self.target.is_available()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         #OcppLog.log_w(f"SWITCH CONNECTOR TURN OFF")

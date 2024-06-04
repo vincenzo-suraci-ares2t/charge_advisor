@@ -9,16 +9,50 @@ import subprocess
 import platform
 from distutils.version import LooseVersion
 
+from .config import *
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Pip command
+# In base alla versione di Python si utilizzerà
+# - "pip" se la versione di python è < 3.12
+# - "python3.12 -m pip" altrimenti
+# ----------------------------------------------------------------------------------------------------------------------
+
+# Aggiornamento del 08/04/2024
+# Dalla versione di python 3.12 il comando pip è deprecato e può dare questo errore:
+# AttributeError: module 'pkgutil' has no attribute 'ImpImporter'. Did you mean: 'zipimporter'?
+# La soluzione è descritta in questo articolo:
+# source: https://ubuntuhandbook.org/index.php/2023/10/fix-broken-pip-python-312-ubuntu/
+
+pip_command = "pip"
+# Ottieni la versione corrente di Python
+versione_python = platform.python_version()
+# Confronta la versione corrente con 3.12
+if LooseVersion(versione_python) >= LooseVersion('3.12'):
+    args = [
+        "python3.12 -m ensurepip --upgrade"
+    ]
+    sub_proc = subprocess.run(
+        args=args,
+        shell=True,
+        capture_output=True
+    )
+    if sub_proc.returncode == 0:
+        logging.info(sub_proc)
+        pip_command = "python3.12 -m pip"
+    else:
+        logging.error(sub_proc)
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Importing dinamico del package ocpp-central-system
 # ----------------------------------------------------------------------------------------------------------------------
-from .config import *
+
 if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
     # ------------------------------------------------------------------------------------------------------------------
     # PRODUCTION
     # ------------------------------------------------------------------------------------------------------------------
     args = [
-        "apk add --update --no-cache --virtual .tmp-build-deps gcc libc-dev linux-headers postgresql-dev",
+        "apk add --update --no-cache --virtual .tmp-build-deps gcc libc-dev linux-headers postgresql-dev && "
         "apk add libffi-dev"
     ]
     sub_proc = subprocess.run(
@@ -36,7 +70,10 @@ if INTEGRATION_TYPE == INTEGRATION_TYPE_PROD:
     # Url al repository git (bitbucket) di ocpp_central_system
     package_url = "git+ssh://git@bitbucket.org/a2t-smartcity/ocpp-central-system.git"
     args = [
-        f"eval `ssh-agent -s` && ssh-add {key_path} && ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && pip install {package_url} --upgrade"
+        f"eval `ssh-agent -s` && "
+        f"ssh-add {key_path} && "
+        f"ssh -o StrictHostKeyChecking=no -T git@bitbucket.org && "
+        f"{pip_command} install {package_url} --upgrade"
     ]
     sub_proc = subprocess.run(
         args=args,
@@ -51,30 +88,8 @@ elif INTEGRATION_TYPE == INTEGRATION_TYPE_DEV:
     # ------------------------------------------------------------------------------------------------------------------
     # DEVELOPER
     # ------------------------------------------------------------------------------------------------------------------
-    # Aggiornamento del 08/04/2024
-    # Dalla versione di python 3.12 il comando pip è deprecato e può dare questo errore:
-    # AttributeError: module 'pkgutil' has no attribute 'ImpImporter'. Did you mean: 'zipimporter'?
-    # La soluzione è descritta in questo articolo:
-    # source: https://ubuntuhandbook.org/index.php/2023/10/fix-broken-pip-python-312-ubuntu/
+
     # Installazione del package da locale, modalità DEV
-    pip_command = "pip"
-    # Ottieni la versione corrente di Python
-    versione_python = platform.python_version()
-    # Confronta la versione corrente con 3.12
-    if LooseVersion(versione_python) >= LooseVersion('3.12'):
-        args = [
-            "python3.12 -m ensurepip --upgrade"
-        ]
-        sub_proc = subprocess.run(
-            args=args,
-            shell=True,
-            capture_output=True
-        )
-        if sub_proc.returncode == 0:
-            logging.info(sub_proc)
-            pip_command = "python3.12 -m pip"
-        else:
-            logging.error(sub_proc)
     local_package_name = "./custom_components/charge_advisor/ocpp_central_system"
     args = [
         f"{pip_command} install --upgrade --force-reinstall -e {local_package_name}"

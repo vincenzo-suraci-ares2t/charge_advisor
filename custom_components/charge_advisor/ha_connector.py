@@ -32,14 +32,17 @@ from .const import DOMAIN, HA_UPDATE_ENTITIES_WAITING_SECS
 from .ha_metric import HomeAssistantEntityMetrics
 
 
-class HomeAssistantConnector(Connector, HomeAssistantEntityMetrics):
+class HomeAssistantConnector(
+    Connector,
+    HomeAssistantEntityMetrics
+):
     """Server side representation of a charger's connector."""
 
     def __init__(
-            self,
-            hass,
-            charge_point,
-            connector_id = 0,
+        self,
+        hass,
+        charge_point,
+        connector_id = 0,
     ):
 
         self._hass = hass
@@ -84,7 +87,7 @@ class HomeAssistantConnector(Connector, HomeAssistantEntityMetrics):
     # ------------------------------------------------------------------------------------------------------------------
 
     def is_available(self):
-        return self._charge_point.is_available()
+        return self.charge_point.is_available()
 
     async def call_ha_service(
             self,

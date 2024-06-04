@@ -129,11 +129,7 @@ class ChargePointButtonEntity(ButtonEntity):
 
     @property
     def available(self) -> bool:
-        # Return if sensor is available.
-        if self.target.is_available is None:
-            return False
-        else:
-            return self.target.is_available
+        return self.target.is_available()
 
     async def async_press(self) -> None:
         """Triggers the charger press action service."""

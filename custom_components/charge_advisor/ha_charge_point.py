@@ -129,6 +129,10 @@ class HomeAssistantChargePoint(
         # Lista di connettori
         self._connectors: list[HomeAssistantConnector] = []
 
+    @property
+    def status(self):
+        return self._status
+
     # overridden
     def _get_init_auth_id_tags(self):
         config = self._hass.data[DOMAIN].get(CONFIG, {})
@@ -136,6 +140,9 @@ class HomeAssistantChargePoint(
             CONF_AUTH_LIST,
             super()._get_init_auth_id_tags()
         )
+
+    def get_device_registry_identifier(self):
+        return {(DOMAIN, self.id)}
 
     # overridden
     async def post_connect(self):
@@ -205,15 +212,21 @@ class HomeAssistantChargePoint(
 
             if not self._booting:
 
-                await ChargePoint.post_connect(self)
+                await self.async_update_ha_device_info()
+
+                await super().post_connect()
+
+                self._hass.async_create_task(
+                    self.update_ha_entities()
+                )
 
                 self._booting = True
 
                 self.post_connect_success = False
 
-                # ----------------------------------------------------------------------------------------------------------
+                # ------------------------------------------------------------------------------------------------------
                 # REGISTRAZIONE DEI SERVIZI SU HOME ASSISTANT
-                # ----------------------------------------------------------------------------------------------------------
+                # ------------------------------------------------------------------------------------------------------
 
                 """ Register custom services with home assistant """
                 self._hass.services.async_register(
@@ -258,7 +271,9 @@ class HomeAssistantChargePoint(
                     self.post_connect_success = True
 
         except NotImplementedError as e:
-            OcppLog.log_e(f"Configuration of the charger failed: {e}")
+            OcppLog.log_e(
+                f"Configuration of the Charge Point {self.id} failed: {e}"
+            )
 
         self._booting = False
 
@@ -285,7 +300,7 @@ class HomeAssistantChargePoint(
         # Update sensors values in HA
         er = entity_registry.async_get(self._hass)
         dr = device_registry.async_get(self._hass)
-        identifiers = {(DOMAIN, self.id)}
+        identifiers = self.get_device_registry_identifier()
         cp_dev = dr.async_get_device(identifiers)
         for cp_ent in entity_registry.async_entries_for_device(er, cp_dev.id):
             if cp_ent.unique_id not in self.ha_entity_unique_ids:
@@ -301,10 +316,10 @@ class HomeAssistantChargePoint(
         self._updating_entities = False
 
     def is_available(self):
-        return self._status == STATE_OK
+        return super().is_operative() and self.status == STATE_OK
 
     async def add_ha_entities(self):
-        await self._central.add_ha_entities()
+        await self.central_system.add_ha_entities()
 
     async def call_ha_service(
             self,
@@ -317,7 +332,7 @@ class HomeAssistantChargePoint(
         resp = False
         match service_name:
             case HAChargePointServices.service_availability.name:
-                resp = await self.set_availability(state, connector_id)
+                resp = await self.change_availability(state, connector_id)
             case HAChargePointServices.service_charge_start.name:
                 resp = await self.remote_start_transaction(connector_id)
             case HAChargePointServices.service_charge_stop.name:
@@ -332,12 +347,12 @@ class HomeAssistantChargePoint(
                 OcppLog.log_w(f"Home Assistant Charge Point Service {service_name} unknown")
         return resp
 
-    async def async_update_ha_device_info(self, boot_info: dict):
+    async def async_update_ha_device_info(self):
 
         """Update device info asynchronuously."""
-        identifiers = {(DOMAIN, self.id)}
+        identifiers = self.get_device_registry_identifier()
 
-        serial = boot_info.get(OcppMisc.charge_point_serial_number.name, None)
+        serial = self.get_serial()
         if serial is not None:
             identifiers.add((DOMAIN, serial))
 
@@ -347,12 +362,10 @@ class HomeAssistantChargePoint(
             config_entry_id=self._config_entry.entry_id,
             identifiers=identifiers,
             name=self.id,
-            manufacturer=boot_info.get(OcppMisc.charge_point_vendor.name, None),
-            model=boot_info.get(OcppMisc.charge_point_model.name, None),
-            sw_version=boot_info.get(OcppMisc.charge_point_firmware_version.name, None),
+            manufacturer=self.get_vendor(),
+            model=self.get_model(),
+            sw_version=self.get_firmware_version(),
         )
-
-        # OcppLog.log_d(f"{self.id} device info updated with the BootNotification data")
 
     # ------------------------------------------------------------------------------------------------------------------
     # Event Loop Tasks
@@ -389,25 +402,6 @@ class HomeAssistantChargePoint(
     def create_security_event_task(self, msg):
         self._hass.async_create_task(
             self.notify(msg)
-        )
-
-    # overridden
-    def create_boot_notification_task(self, kwargs):
-        self._hass.async_create_task(
-            self.async_update_ha_device_info(kwargs)
-        )
-        self._hass.async_create_task(
-            self.update_ha_entities()
-        )
-        super().create_boot_notification_task(kwargs)
-
-    # overridden
-    def create_triggered_boot_notification_task(self, msg):
-        self._hass.async_create_task(
-            self.notify(msg)
-        )
-        self._hass.async_create_task(
-            self.post_connect()
         )
 
     # overridden
@@ -500,19 +494,19 @@ class HomeAssistantChargePoint(
 
     # overridden
     async def stop(self):
-        # Setto lo stato "interno" ad Unavailable
+        # Set the inner (Home Assistant) status to "Unavailable"
         self._status = STATE_UNAVAILABLE
-        # Setto la metrica "Availability" del Charge Point in "Inoperative"
-        self.set_availability(AvailabilityType.inoperative.value)
-        # Prendiamo tutti i connettori del Charge Point
+        # Set the Charge Point "Availability" metric to "Inoperative"
+        await self.set_availability(AvailabilityType.inoperative.value)
+        # Loop over all the Charge Point Connectors
         for connector in self.connectors:
-            # Setto la metrica "Availability" del Connettore in "Inoperative"
-            connector.set_availability(AvailabilityType.inoperative.value)
-            # Setto la metrica "Status" del Connettore in "Unavailable" che è un sensore di Home Assistant
+            # Set the Connector "Availability" metric to "Inoperative"
+            await connector.set_availability(AvailabilityType.inoperative.value)
+            # Set the Connector "Status" metric to "Unavailable": it is a Home Assistant Sensor
             key = HAConnectorSensors.status
             value = ChargePointStatus.unavailable.value
             connector.set_metric_value(key, value)
-            # Avviso il Charge Advisor Backend del cambio di stato del Point Of Delivery associato al connettore
+            # Notify Charge Advisor Backend of Point Of Delivery (associated to the Connector) status change
             await asyncio.create_task(
                 self.central_system.notify_point_of_delivery_status_to_charge_advisor_backend(
                     charging_station_id=self.id,
@@ -521,9 +515,9 @@ class HomeAssistantChargePoint(
                     ocpp_version=self.ocpp_protocol_version
                 )
             )
-        # Aggiorno le entità di Home Assistant associate al Charge Point
+        # Update all the Home Assistant entities associated to the Charge Point
         await self.update_ha_entities()
-        # Chiamo la funzione stop() della classe padre
+        # Call the spuer-class stop() function
         await super().stop()
 
     # overridden

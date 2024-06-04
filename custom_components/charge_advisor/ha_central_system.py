@@ -155,8 +155,12 @@ class HomeAssistantCentralSystem(
     def hass(self):
         return self._hass
 
+    @property
+    def status(self):
+        return self._status
+
     def is_available(self):
-        return self._status == STATE_OK
+        return self.status == STATE_OK
 
     @staticmethod
     async def get_instance(params = {}):
@@ -168,14 +172,38 @@ class HomeAssistantCentralSystem(
         self,
         charge_point,
         connector_id,
-        id_tag: str | None = None
+        evse_id=None,
+        id_tag: str | None = None,
+        parent_id_tag=None,
+        reservation_id=None,
+        expiry_date=None,
+        session_params = None
     ):
-        return self._hass.async_create_task(
-            charge_point.remote_start_transaction(
-                connector_id,
-                id_tag
+        if evse_id is None:
+            # ----------------------------------------------------------------------------------------------------------
+            # Create a task to remotely start a transaction using OCPP 1.6.
+            # ----------------------------------------------------------------------------------------------------------
+            task = charge_point.remote_start_transaction(
+                connector_id=connector_id,
+                id_tag=id_tag,
+                session_params=session_params
             )
-        )
+        else:
+            # ----------------------------------------------------------------------------------------------------------
+            # Create a task to remotely start a transaction using OCPP 2.0.1.
+            # ----------------------------------------------------------------------------------------------------------
+            evse = charge_point.get_evse_by_id(evse_id)
+            task = evse.remote_start_transaction(
+                id_tag=id_tag,
+                parent_id_tag=parent_id_tag,
+                reservation_id=reservation_id,
+                expiry_date=expiry_date,
+                session_params=session_params
+            )
+        # ----------------------------------------------------------------------------------------------------------
+        # Perform the created task.
+        # ----------------------------------------------------------------------------------------------------------
+        return self._hass.async_create_task(task)
 
     def async_create_remote_stop_transaction_task(
         self,
@@ -331,7 +359,7 @@ class HomeAssistantCentralSystem(
         else:
             OcppLog.log_w("Il Thread for Websocket communication is already in execution")
             OcppLog.log_w("Stopping old one ...")
-            self._charge_advisor_handler.stop_websocket_client()
+            await self._charge_advisor_handler.stop_websocket_client()
             self._charge_advisor_thread_websocket = None
 
             return True
@@ -343,7 +371,7 @@ class HomeAssistantCentralSystem(
     async def stop_charge_advisor_backend_communication(self):
 
         self.charge_advisor_handler.stop_api_client()
-        self.charge_advisor_handler.stop_websocket_client()
+        await self.charge_advisor_handler.stop_websocket_client()
 
         self.stop_charge_advisor_threads()
 

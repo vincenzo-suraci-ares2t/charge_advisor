@@ -152,11 +152,7 @@ class ChargePointOcppNumber(RestoreNumber, NumberEntity):
 
     @property
     def available(self) -> bool:
-        # Return if sensor is available.
-        if self.target.is_available is None:
-            return False
-        else:
-            return self.target.is_available
+        return self.target.is_available()
 
     @callback
     def _schedule_immediate_update(self):
@@ -185,7 +181,7 @@ class ChargePointOcppNumber(RestoreNumber, NumberEntity):
                     self._attr_native_value = num_value
                     self.async_write_ha_state()
         elif self._charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
-            if self.target.is_available and self._charge_point.get_metric("SmartChargingCtrlr.Available"):
+            if self.target.is_available() and self._charge_point.get_metric("SmartChargingCtrlr.Available"):
 
                 resp = await self.target.set_max_charge_rate(
                     limit_amps=num_value * 3

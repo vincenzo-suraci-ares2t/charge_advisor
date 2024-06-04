@@ -105,7 +105,7 @@ class OcppSensor:
     @staticmethod
     def get_charge_point_entities(
         hass,
-        charge_point: ChargePoint
+        charge_point
     ):
 
         # Recupero della Central System
@@ -452,11 +452,7 @@ class ChargePointMetric(RestoreSensor, SensorEntity):
 
     @property
     def available(self) -> bool:
-        # Return if sensor is available.
-        if self.target.is_available is None:
-            return False
-        else:
-            return self.target.is_available
+        return self.target.is_available()
 
     @property
     def should_poll(self):

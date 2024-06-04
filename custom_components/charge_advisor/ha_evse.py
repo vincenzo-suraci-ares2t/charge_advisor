@@ -23,6 +23,7 @@ from ocpp.exceptions import NotImplementedError
 from homeassistant.components.persistent_notification import DOMAIN as PN_DOMAIN
 from homeassistant.const import STATE_OK, STATE_UNAVAILABLE, UnitOfTime
 from homeassistant.helpers import device_registry, entity_component, entity_registry
+from homeassistant.helpers.typing import UNDEFINED
 import homeassistant.helpers.config_validation as cv
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -87,11 +88,11 @@ class HomeAssistantEVSEV201(
     """Home Assistant representation of a Charge Point"""
 
     def __init__(
-            self,
-            id: str,
-            hass,
-            config_entry,
-            charge_point
+        self,
+        id: str,
+        hass,
+        config_entry,
+        charge_point
     ):
 
         # --------------------------------------------------------------------------------------------------------------
@@ -172,11 +173,6 @@ class HomeAssistantEVSEV201(
             #OcppLog.log_w(f"Tipo di connettore associato all'EVSE: {type(conn)}.")
             await conn.update_ha_entities()
 
-
-    #def is_available(self):
-    #    return self._status == STATE_OK
-
-
     # ------------------------------------------------------------------------------------------------------------------
     # Event Loop Tasks
     # ------------------------------------------------------------------------------------------------------------------
@@ -200,15 +196,17 @@ class HomeAssistantEVSEV201(
         # Creazione del dispositivo connettore.
         await super().add_connector(connector_id)
         ha_conn = self.get_connector_by_id(connector_id)
-
         dr = device_registry.async_get(self._hass)
+        model = UNDEFINED
+        if self.charging_station.model is not None:
+            model = self.charging_station.model + " Connector"
         dr.async_get_or_create(
             config_entry_id=self._config_entry.entry_id,
-            identifiers={(DOMAIN, str(self._charge_point.id) + '_' + ha_conn.identifier)},
-            name=str(self._charge_point.id) + '_' + ha_conn.identifier,
-            model=self._charge_point.model + " Connector",
+            identifiers={(DOMAIN, ha_conn.identifier)},
+            name=ha_conn.identifier,
+            model=model,
             via_device=(DOMAIN, self.identifier),
-            manufacturer=self._charge_point.vendor
+            manufacturer=self.charging_station.vendor
         )
 
     # overridden
@@ -250,8 +248,9 @@ class HomeAssistantEVSEV201(
     def is_available_for_charging(self):
         return super().is_available_for_charging() and self.is_available()
 
+    # overridden
     def is_available(self):
-        return self.charge_point.is_available
+        return super().is_available() and self.charge_point.is_available()
 
     ####################################################################################################################
     # Metodo per gestire le istruzioni ricevute dall'interfaccia grafica.
@@ -261,10 +260,6 @@ class HomeAssistantEVSEV201(
             state: bool = True,
             connector_id: int = None
     ):
-        """match service_name:
-            case HAChargePointServices.service_availability.name:
-                if connector_id is not None:
-                    return await self.set_availability(state=state, connector_id=connector_id)"""
         return await self._charge_point.call_ha_service(
             service_name=service_name,
             state=state,

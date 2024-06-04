@@ -70,9 +70,6 @@ class HomeAssistantConnectorV201(
     # Home Assistant Methods
     # ------------------------------------------------------------------------------------------------------------------
 
-    #def is_available(self):
-    #    return self._charge_point.is_available()
-
     async def call_ha_service(
             self,
             service_name: str,
