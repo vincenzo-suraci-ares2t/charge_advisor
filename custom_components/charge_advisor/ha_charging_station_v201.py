@@ -139,6 +139,11 @@ class HomeAssistantChargingStationV201(
     def status(self):
         return self._status
 
+    # Source: https://community.home-assistant.io/t/blocking-call-inside-event-loop/575796
+    # OVERRIDDEN
+    """async def call(self, payload, suppress=True):
+        return await self._hass.async_add_executor_job(super().call, payload, suppress)"""
+
     # overridden
     def _get_init_auth_id_tags(self):
         config = self._hass.data[DOMAIN].get(CONFIG, {})
