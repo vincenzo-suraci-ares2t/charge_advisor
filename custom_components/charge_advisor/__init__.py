@@ -212,10 +212,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Register Central System Device
     hass.data[DOMAIN][entry.entry_id] = cs
 
-    for platform in PLATFORMS:
-        await hass.config_entries.async_forward_entry_setup(
-            entry, platform
-        )
+    # for platform in PLATFORMS:
+    #     await hass.config_entries.async_forward_entry_setup(
+    #         entry, platform
+    #     )
+    await hass.config_entries.async_forward_entry_setups(
+        entry, PLATFORMS
+    )
 
     return True
 

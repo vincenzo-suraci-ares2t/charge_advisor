@@ -163,7 +163,7 @@ class HomeAssistantCentralSystem(
         return self.status == STATE_OK
 
     @staticmethod
-    async def get_instance(params = {}):
+    async def get_instance(params={}):
         hass = params.get("hass")
         entry = params.get("entry")
         return HomeAssistantCentralSystem(hass, entry)
@@ -250,9 +250,9 @@ class HomeAssistantCentralSystem(
                 msg += "updating"
             msg += f" its own Home Assistant entities > Waiting {HA_UPDATE_ENTITIES_WAITING_SECS} sec"
             OcppLog.log_w(msg)
-            await asyncio.sleep(HA_UPDATE_ENTITIES_WAITING_SECS)    
-    
-            
+            await asyncio.sleep(HA_UPDATE_ENTITIES_WAITING_SECS)
+
+
 
         self._adding_entities = True
 
@@ -264,9 +264,13 @@ class HomeAssistantCentralSystem(
                 self._config_entry, platform
             )
 
-            await self._hass.config_entries.async_forward_entry_setup(
-                self._config_entry, platform
-            )
+            # await self._hass.config_entries.async_forward_entry_setup(
+            #     self._config_entry, platform
+            # )
+
+        await self._hass.config_entries.async_forward_entry_setups(
+            self._config_entry, PLATFORMS
+        )
 
         self._adding_entities = False
 
@@ -349,7 +353,6 @@ class HomeAssistantCentralSystem(
             OcppLog.log_w("Il Thread for the API client is already in execution")
             OcppLog.log_w("Stopping old one ...")
             return True
-
 
         if self._charge_advisor_thread_websocket is None:
             self._charge_advisor_thread_websocket = Thread(

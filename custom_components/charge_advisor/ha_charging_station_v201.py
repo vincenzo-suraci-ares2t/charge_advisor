@@ -129,8 +129,6 @@ class HomeAssistantChargingStationV201(
         ChargingStationV201.__init__(self, id, connection, central, skip_schema_validation)
         HomeAssistantEntityMetrics.__init__(self)
 
-        OcppLog.log_d(f"EVSE ottenuti tramite superclasse: {self._evses}")
-
         # Impostiamo le metriche
         self.set_metric_value(HAChargePointSensors.identifier.value,f"EVSE: {id}")
         self.set_metric_value(HAChargePointSensors.reconnects.value, 0)
@@ -288,17 +286,12 @@ class HomeAssistantChargingStationV201(
         # Update sensors values in HA
         er = entity_registry.async_get(self._hass)
         dr = device_registry.async_get(self._hass)
-        # OcppLog.log_d(f"REGISTRO DISPOSITIVI: {dr.devices}.")
-        # OcppLog.log_d(f"Registro entità: {er.entities}.")
         identifiers = self.get_device_registry_identifier()
         charging_station_dev = dr.async_get_device(identifiers)
-        #OcppLog.log_w(f"Aggiornamento dei Charge Point...")
-        #OcppLog.log_w(f"Entità registrate nel Charge Point: {self.ha_entity_unique_ids}.")
         for charging_station_ent in entity_registry.async_entries_for_device(er, charging_station_dev.id):
             if charging_station_ent.unique_id not in self.ha_entity_unique_ids:
                 # source: https://github.com/home-assistant/core/blob/dev/homeassistant/helpers/entity_registry.py
                 # source: https://dev-docs.home-assistant.io/en/dev/api/helpers.html#module-homeassistant.helpers.entity_registry
-                # OcppLog.log_d(f"La entità {cp_ent.unique_id} è registrata in Home Assistant ma non è stata configurata dalla integrazione: verrà eliminata.")
                 OcppLog.log_w(f"L'entità Home Assistant "
                               f"{charging_station_ent.unique_id} associata al Charge Point "
                               f"{self.id} non è trovata, pertanto verrà rimossa")
@@ -310,34 +303,24 @@ class HomeAssistantChargingStationV201(
                     hass=self._hass,
                     entity_id=charging_station_ent.entity_id
                 )
-        #OcppLog.log_w(f"Charge Point aggiornati.")
-        #OcppLog.log_w(f"Aggiornamento degli EVSE...")
-        #OcppLog.log_w(f"EVSE disponibili da aggiornare: {self.evses}.")
         for evse in self._evses:
-            #OcppLog.log_w(f"HA-EVSE in esame: {evse}.")
-            #OcppLog.log_w(f"Entità registrate nell'EVSE in esame: {evse.ha_entity_unique_ids}.")
             identifiers = {(DOMAIN, evse.identifier)}
             evse_dev = dr.async_get_device(identifiers)
-            # OcppLog.log_w(f"Device EVSE associato: {ev_dev}.")
             for evse_ent in entity_registry.async_entries_for_device(er, evse_dev.id):
                 if evse_ent.unique_id not in evse.ha_entity_unique_ids:
                     er.async_remove(
                         entity_id=evse_ent.entity_id
                     )
                 else:
+                    # OcppLog.log_d(f"Updating entity {evse_ent.entity_id}...")
                     await entity_component.async_update_entity(
                         hass=self._hass,
                         entity_id=evse_ent.entity_id
                     )
-            #OcppLog.log_w(f"Aggiornamento connettori associati all'EVSE {evse.id}.")
             for conn in evse.connectors:
                 await conn.update_ha_entities()
-            #OcppLog.log_w(f"Connettori aggiornati.")
-        #OcppLog.log_w(f"EVSE aggiornati.")
 
         self._updating_entities = False
-
-        #OcppLog.log_i(f"Aggiornamento delle entità HA terminato correttamente.")
 
     # overridden
     async def post_start_transaction_event(self):
@@ -371,9 +354,9 @@ class HomeAssistantChargingStationV201(
             case HAChargePointServices.service_unlock.name:
                 resp = await self.unlock(evse_id)
             case HAChargePointServices.service_set_charge_rate:
-                resp = await self.set_charge_rate(evse_id = evse_id, limit_amps=0)
+                resp = await self.set_charge_rate(evse_id=evse_id, limit_amps=0)
             case _:
-                OcppLog.log_d(f"{service_name} unknown")
+                OcppLog.log_w(f"{service_name} unknown")
         return resp
 
     async def async_update_ha_device_info(self):
@@ -414,9 +397,6 @@ class HomeAssistantChargingStationV201(
             charge_point=self
         )
 
-        #OcppLog.log_w(f"EVSE di nome {ha_evse.identifier} aggiunto correttamente al registro dispositivi.")
-        #OcppLog.log_w(f"Creazione EVSE integrato...")
-        #OcppLog.log_w(f"EVSE integrato creato correttamente.")
         return ha_evse
 
     def create_trigger_status_notification_task(self, evse_id):
@@ -469,9 +449,9 @@ class HomeAssistantChargingStationV201(
 
     # overridden
     async def add_evses(self, number_of_evses):
-        OcppLog.log_d(f"Aggiunta degli EVSE lato ChargeAdvisor.")
+        OcppLog.log_i(f"Aggiunta degli EVSE lato ChargeAdvisor.")
         await super().add_evses(number_of_evses)
-        OcppLog.log_d(f"Aggiunta degli EVSE come entità lato integrazione HA.")
+        OcppLog.log_i(f"Aggiunta degli EVSE come entità lato integrazione HA.")
         await self.add_ha_entities()
 
     # overridden
@@ -614,3 +594,19 @@ class HomeAssistantChargingStationV201(
             self._hass.async_create_task(self.add_new_entities())
             self._hass.async_create_task(self.update_ha_entities())
         return res
+
+    # overridden
+    async def read_meter_values(
+            self,
+            meter_values,
+            evse = None,
+            transaction_info = None,
+    ):
+        # --------------------------------------------------------------------------------------------------------------
+        # Firstly, execute the instructions in the overridden method.
+        # --------------------------------------------------------------------------------------------------------------
+        await super().read_meter_values(meter_values, evse, transaction_info)
+        # --------------------------------------------------------------------------------------------------------------
+        # Then, update all the Home Assistant entities.
+        # --------------------------------------------------------------------------------------------------------------
+        await self._hass.async_create_task(self.update_ha_entities())

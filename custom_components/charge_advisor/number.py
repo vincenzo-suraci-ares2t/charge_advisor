@@ -19,7 +19,7 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     RestoreNumber,
 )
-from homeassistant.const import UnitOfElectricCurrent
+from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
@@ -36,12 +36,15 @@ from homeassistant.helpers.entity import DeviceInfo
 
 from ocpp_central_system.time_utils import TimeUtils
 
+from .ocpp_central_system.ocpp_central_system.logger import OcppLog
 # ----------------------------------------------------------------------------------------------------------------------
 # Local files
 # ----------------------------------------------------------------------------------------------------------------------
 
 from .const import *
 from .enums import Profiles, SubProtocol
+
+from ocpp.v201.enums import AttributeType
 
 @dataclass
 class OcppNumberDescription(NumberEntityDescription):
@@ -61,63 +64,109 @@ NUMBERS: Final = [
         native_step=1,
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
     ),
+    OcppNumberDescription(
+        key="maximum_power",
+        name="Maximum Power",
+        icon=ICON,
+        initial_value=0,
+        native_min_value=0,
+        native_max_value=DEFAULT_MAX_POWER,
+        native_step=10,
+        native_unit_of_measurement=UnitOfPower.KILO_WATT
+    )
 ]
 
 
 async def async_setup_entry(hass, entry, async_add_devices):
     """Configure the number platform."""
-
+    # ------------------------------------------------------------------------------------------------------------------
+    # Retrieve the central system object.
+    # ------------------------------------------------------------------------------------------------------------------
     central_system: CentralSystem = hass.data[DOMAIN][entry.entry_id]
 
     entities = []
-
+    # ------------------------------------------------------------------------------------------------------------------
+    # Loop through the IDs of all the charge points of the central system in question...
+    # ------------------------------------------------------------------------------------------------------------------
     for cp_id in central_system.charge_points:
-        
+        # --------------------------------------------------------------------------------------------------------------
+        # Retrieve the charge point object itself.
+        # --------------------------------------------------------------------------------------------------------------
         charge_point: HomeAssistantChargePoint = central_system.charge_points[cp_id]
-
+        # --------------------------------------------------------------------------------------------------------------
+        # For each entity described in the NUMBERS array...
+        # --------------------------------------------------------------------------------------------------------------
         for ent in NUMBERS:
+            # ----------------------------------------------------------------------------------------------------------
+            # If the entity's key is "maximum_current"...
+            # ----------------------------------------------------------------------------------------------------------
             if ent.key == "maximum_current":
                 ent.initial_value = 0
                 ent.native_max_value = entry.data.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT)
+            # ----------------------------------------------------------------------------------------------------------
+            # Add a ChargePointOcppNumber instance to the list of entities.
+            # ----------------------------------------------------------------------------------------------------------
             entities.append(ChargePointOcppNumber(hass, central_system, charge_point, ent))
-
+        # --------------------------------------------------------------------------------------------------------------
+        # Check whether the OCPP version of the charge point is 1.6 or 2.0.1...
+        # --------------------------------------------------------------------------------------------------------------
         if charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
+            # ----------------------------------------------------------------------------------------------------------
+            # If it's 1.6, loop through all the connectors...
+            # ----------------------------------------------------------------------------------------------------------
             for connector in charge_point.connectors:
                 for ent in NUMBERS:
+                    # --------------------------------------------------------------------------------------------------
+                    # If the entity's key is "maximum_current"...
+                    # --------------------------------------------------------------------------------------------------
                     if ent.key == "maximum_current":
                         ent.initial_value = 0
                         ent.native_max_value = entry.data.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT)
+                    # --------------------------------------------------------------------------------------------------
+                    # Add a ChargePointConnectorOcppNumber object to the entity list.
+                    # --------------------------------------------------------------------------------------------------
                     entities.append(ChargePointConnectorOcppNumber(hass, central_system, charge_point, connector, ent))
         elif charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
+            # ----------------------------------------------------------------------------------------------------------
+            # If it's 2.0.1, loop through all the EVSEs...
+            # ----------------------------------------------------------------------------------------------------------
             for evse in charge_point.evses:
                 for ent in NUMBERS:
+                    # --------------------------------------------------------------------------------------------------
+                    # If the entity's key is "maximum_current"...
+                    # --------------------------------------------------------------------------------------------------
                     if ent.key == "maximum_current":
                         ent.initial_value = 0
-                        ent.native_max_value = entry.data.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT)
+                        ent.native_max_value = entry.data.get(CONF_MAX_CURRENT, 375)
+                    # --------------------------------------------------------------------------------------------------
+                    # Add a ChargePointConnectorOcppNumber object to the entity list.
+                    # --------------------------------------------------------------------------------------------------
                     entities.append(ChargePointConnectorOcppNumber(hass, central_system, charge_point, evse, ent))
-
+    # ------------------------------------------------------------------------------------------------------------------
     # Aggiungiamo gli unique_id di ogni entità registrata in fase di setup al
     # Charge Point o al Connector
+    # ------------------------------------------------------------------------------------------------------------------
     for entity in entities:
         entity.append_entity_unique_id()
-
+    # ------------------------------------------------------------------------------------------------------------------
+    # Add all the entities as devices.
+    # ------------------------------------------------------------------------------------------------------------------
     async_add_devices(entities, False)
 
 
 class ChargePointOcppNumber(RestoreNumber, NumberEntity):
-    """Individual slider for setting charge rate."""
 
     _attr_has_entity_name = True
     entity_description: OcppNumberDescription
 
     def __init__(
-        self,
-        hass: HomeAssistant,
-        central_system: CentralSystem,
-        charge_point: ChargePoint,
-        description: OcppNumberDescription,
+            self,
+            hass: HomeAssistant,
+            central_system: CentralSystem,
+            charge_point: ChargePoint,
+            description: OcppNumberDescription,
     ):
-        """Initialize a Number instance."""        
+        """Initialize a Number instance."""
         self._hass = hass
         self._central_system = central_system
         self._charge_point = charge_point
@@ -167,26 +216,83 @@ class ChargePointOcppNumber(RestoreNumber, NumberEntity):
     #        return False
     #    return self._central_system.get_available(self.cp_id)  # type: ignore [no-any-return]
 
+    # ------------------------------------------------------------------------------------------------------------------
+    # Method to handle what happens when the slider is used.
+    # ------------------------------------------------------------------------------------------------------------------
     async def async_set_native_value(self, value):
-        """Set new value."""
+        # --------------------------------------------------------------------------------------------------------------
+        # Cast the new value to integer.
+        # --------------------------------------------------------------------------------------------------------------
         num_value = int(value)
+        # --------------------------------------------------------------------------------------------------------------
+        # Check whether OCPP 1.6 or 2.0.1 is used...
+        # --------------------------------------------------------------------------------------------------------------
         if self._charge_point.connection_ocpp_version == SubProtocol.OcppV16.value:
-            if self.target.is_available() and ((Profiles.SMART & self._charge_point.supported_features) or True) :
-
+            # ----------------------------------------------------------------------------------------------------------
+            # Check whether the Connector is available and the supported features are enabled.
+            # ----------------------------------------------------------------------------------------------------------
+            if self.target.is_available() and ((Profiles.SMART & self._charge_point.supported_features) or True):
+                # ------------------------------------------------------------------------------------------------------
+                # Set the maximum current to the new value multiplied by the number of phases.
+                #
+                # TODO: the number of phases is currently (21/10/24) hard-coded to 3, it has to be made dynamic
+                #  depending on the number of phases actually supported by the Connector.
+                # ------------------------------------------------------------------------------------------------------
                 resp = await self.target.set_max_charge_rate(
                     limit_amps=num_value * 3
                 )
-
+                # ------------------------------------------------------------------------------------------------------
+                # If the outcome of the attempt to set the new charge rate is successful, set the new value attribute
+                # and update the value of the Home Assistant object itself.
+                # ------------------------------------------------------------------------------------------------------
                 if resp is True:
                     self._attr_native_value = num_value
                     self.async_write_ha_state()
         elif self._charge_point.connection_ocpp_version == SubProtocol.OcppV201.value:
             if self.target.is_available() and self._charge_point.get_metric("SmartChargingCtrlr.Available"):
-
-                resp = await self.target.set_max_charge_rate(
-                    limit_amps=num_value * 3
-                )
-
+                # ------------------------------------------------------------------------------------------------------
+                # Check whether the attribute to be changed is current or power...
+                # ------------------------------------------------------------------------------------------------------
+                if self._attr_name == "Maximum Current":
+                    # --------------------------------------------------------------------------------------------------
+                    # Retrieve the number of phases used by the EVSE.
+                    # --------------------------------------------------------------------------------------------------
+                    phases_variable = await self.target.charging_station.get_single_variable_generic(
+                        component_name=self.target.get_component("EVSE").name,
+                        evse_id=self.target.id,
+                        variable_name="SupplyPhases",
+                        attribute_type=AttributeType.actual.value
+                    )
+                    phases = int(phases_variable[0])
+                    # --------------------------------------------------------------------------------------------------
+                    # Using the number of phases, check whether the Charging Station operates in AC or DC.
+                    #
+                    # According to the OCPP 2.0.1 specifications, section "Referenced Components and Variables",
+                    # paragraph 2.13.6, if the number of phases is 0 the charging station uses DC.
+                    # --------------------------------------------------------------------------------------------------
+                    if phases == 0:
+                        # ----------------------------------------------------------------------------------------------
+                        # Set the number of phases to 1 to avoid multiplying by 0.
+                        # ----------------------------------------------------------------------------------------------
+                        phases = 1
+                    # --------------------------------------------------------------------------------------------------
+                    # Set the maximum current to the new value multiplied by the number of phases.
+                    # --------------------------------------------------------------------------------------------------
+                    resp = await self.target.set_max_charge_rate(
+                        limit_amps=num_value * phases
+                    )
+                elif self._attr_name == "Maximum Power":
+                    # --------------------------------------------------------------------------------------------------
+                    # Set the maximum power to the new value. Since the slider expresses the value in kilowatts, its
+                    # value has to be converted to watts first.
+                    # --------------------------------------------------------------------------------------------------
+                    resp = await self.target.set_max_charge_rate(
+                        limit_watts=num_value * 1000
+                    )
+                # ------------------------------------------------------------------------------------------------------
+                # If the outcome of the attempt to set the new charge rate is successful, set the new value attribute
+                # and update the value of the Home Assistant object itself.
+                # ------------------------------------------------------------------------------------------------------
                 if resp is True:
                     self._attr_native_value = num_value
                     self.async_write_ha_state()

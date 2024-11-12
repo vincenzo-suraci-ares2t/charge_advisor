@@ -34,7 +34,7 @@ import homeassistant.const as ha
 # ----------------------------------------------------------------------------------------------------------------------
 
 from ocpp.v16.enums import ChargePointStatus
-from ocpp.v201.enums import ConnectorStatusType
+from ocpp.v201.enums import ConnectorStatusType, ChargingStateType
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -64,6 +64,14 @@ CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET: Final = [
 
 V201_CONNECTOR_CHARGING_SESSION_SENSORS_AVAILABILTY_SET: Final = [
     ConnectorStatusType.occupied.value
+]
+
+V201_CONNECTOR_CHARGING_SESSION_SENSORS_CHARGING_STATE_SET: Final = [
+    ChargingStateType.charging.value,
+    ChargingStateType.ev_connected.value,
+    ChargingStateType.suspended_ev.value,
+    ChargingStateType.suspended_evse.value,
+    ChargingStateType.idle.value,
 ]
 
 
@@ -263,9 +271,7 @@ class OcppSensor:
                         #OcppLog.log_d(f"Adding Connector ID {connector_id} on EVSE {evse_id}")
 
                 for metric_key in tier_level.measurands_list:
-                    #OcppLog.log_e(f"Adding measurand .....{metric_key}")
-                    sensors.append(
-                        OcppSensorDescription(
+                    desc = OcppSensorDescription(
                             key=metric_key.lower(),
                             name=metric_key.replace(".", " "),
                             metric_key=metric_key,
@@ -274,16 +280,21 @@ class OcppSensor:
                             native_uom=OcppSensor.get_native_uom_by_metric_key(metric_key),
                             native_value=OcppSensor.get_native_value_by_metric_key(metric_key)
                         )
+                    sensors.append(
+                        desc
                     )
 
             create_sensors_from_include_components(charge_point, sensors)
             create_sensors_from_tier_level(charge_point, sensors)
 
             evse_sensors = set(list(V201HAConnectorChargingSessionSensors)) | set(list(HAConnectorChargingSessionSensors))
+            OcppLog.log_d(f"EVSEs: {charge_point.evses}")
             for evse in charge_point.evses:
-                #OcppLog.log_e(f"Adding evseeeee {evse}")
+                OcppLog.log_i(f"Sensors prima di aggiungere quelli creati con include components: {sensors}.")
                 create_sensors_from_include_components(evse, sensors)
+                OcppLog.log_d(f"Sensors prima di aggiungere quelli creati a partire dai tier level: {sensors}.")
                 create_sensors_from_tier_level(evse, sensors)
+                OcppLog.log_w(f"Sensors dopo aver aggiunto entrambi: {sensors}.")
                 for metric_key in list(evse_sensors):
                     sensors.append(
                         OcppSensorDescription(
@@ -374,8 +385,6 @@ class OcppSensor:
 # A workaround to do it at runtime: https://community.home-assistant.io/t/adding-entities-at-runtime/200855/2
 async def async_setup_entry(hass, entry, async_add_devices):
 
-    #OcppLog.log_i("Sensor async_setup_entry called!")
-
     # Configure the sensor platform
     central_system: CentralSystem = hass.data[DOMAIN][entry.entry_id]
 
@@ -383,7 +392,8 @@ async def async_setup_entry(hass, entry, async_add_devices):
 
     for cp_id in central_system.charge_points:
         charge_point = central_system.charge_points[cp_id]
-        for charge_point_entity in OcppSensor.get_charge_point_entities(hass, charge_point):
+        charge_point_entities = OcppSensor.get_charge_point_entities(hass, charge_point)
+        for charge_point_entity in charge_point_entities:
             entities.append(charge_point_entity)
 
     # Aggiungiamo gli unique_id di ogni entità registrata in fase di setup al
@@ -556,8 +566,9 @@ class ChargePointMetric(RestoreSensor, SensorEntity):
         value = self.target.get_metric_value(self._metric_key)
         if isinstance(value, float):
             value = round(value, self.entity_description.scale)
-        if value is not None:
+        if value is not None or self.native_unit_of_measurement is not None:
             self._attr_native_value = value
+
         # OcppLog.log_d(f"{self._attr_unique_id} value: {self._attr_native_value}")
         return self._attr_native_value
 

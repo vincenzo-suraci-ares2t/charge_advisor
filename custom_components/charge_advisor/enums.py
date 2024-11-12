@@ -92,6 +92,10 @@ class HAConnectorChargingSessionSensors(str, Enum):
     energy_meter_start = ChargingSessionStatus.energy_meter_start.value
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Despite having to contain the same members of the HAConnectorChargingSessionSensors enumeration class, this class
+# can't simply extend it, because in Python the classes that extend Enum can't be further extended.
+# ----------------------------------------------------------------------------------------------------------------------
 class V201HAConnectorChargingSessionSensors(str, Enum):
     HAConnectorChargingSessionSensors.__members__.items()
     charging_connector = ChargingSessionStatus.charging_connector.value
